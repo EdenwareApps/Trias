@@ -1,0 +1,30 @@
+{
+  "name": "trias",
+  "version": "0.0.1",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "./dist/trias.js",
+  "exports": {
+    ".": {
+      "require": "./dist/trias.js",
+      "import": "./src/trias.js"
+    }
+  },
+  "scripts": {
+    "test": "node test/test.js",
+    "prepare": "npx rollup -c"
+  },
+  "dependencies": {
+    "natural": "^8.0.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "rollup": "^4.34.8",
+    "rollup-plugin-node-builtins": "^2.1.2"
+  }
+}
