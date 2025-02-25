@@ -4,9 +4,9 @@ import babel from '@rollup/plugin-babel';
 import json from '@rollup/plugin-json'
 
 export default {
-  input: 'src/trias.js',
+  input: 'src/trias.mjs',
   output: {
-    file: 'dist/trias.js',
+    file: 'dist/trias.cjs',
     format: 'cjs'
   },
   plugins: [
@@ -14,8 +14,7 @@ export default {
     commonjs(),
     json(),
     babel({
-      babelHelpers: 'bundled',
-      exclude: 'node_modules/**'
+      babelHelpers: 'bundled'
     })
   ]
 };

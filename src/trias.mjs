@@ -1,27 +1,27 @@
-import { getStemmer } from './stemmer.js';
+import { getStemmer } from './stemmer.mjs';
 import fs from 'fs';
+import path from 'path';
 import zlib from 'zlib';
 
 /**
  * Trias class
  * 
- * Inspired by the ancient Greek Trías—the three prophetic nymphs (Cleodora, Melena, and Dafnis)
- * who presided over divination via sacred stones and honey (see: Harvard Studies in Classical Philology;
- * The Mythical Creatures Bible, Bane, 2013).
+ * Inspired by the ancient Greek Trias—the three prophetic nymphs (Cleodora, Melena, and Dafnis)
+ * who performed divination through sacred rituals.
  * 
- * This class functions as an oracle that learns (inscribes) prophetic texts and later predicts 
- * the most likely oracle category (prophecy outcome) from input texts using a TF-IDF approach.
+ * This class functions as an oracle that learns (records) prophetic texts and later predicts 
+ * the oracle category (prophecy outcome) from input texts using a TF-IDF approach.
  */
 export class Trias {
     constructor({
-        file = './model.trias', // Compressed model file (the "tome of prophecies")
+        file = './model.trias', // model file (the "tome of prophecies")
         initIfMissing = true,
         n = 3,
         language = 'en',
         weightExponent = 2,
         capitalize = false,
         excludes = ['separator', 'separador', 'hd', 'hevc', 'sd', 'fullhd', 'fhd', 'channels', 'canais', 'aberto', 'abertos', 'world', 'países', 'paises', 'countries', 'ww', 'live', 'ao vivo', 'en vivo', 'directo', 'en directo', 'unknown', 'other', 'others'],
-        size = 512 * 1024  // Approximate model size in bytes (limit for the prophetic tome)
+        size = 4096 * 1024  // Approximate model size in bytes (limit for the prophetic tome)
     } = {}) {
         this.file = file;
         this.weightExponent = weightExponent;
@@ -29,27 +29,45 @@ export class Trias {
         this.n = n;
         this.stemmer = getStemmer(language);
         this.maxModelSize = size;
-        this.avgOmenSize = null;  // Average size per omen (calculated from compressed JSON)
+        this.avgOmenSize = null;  // Average size per omen (calculated from condensed model file)
 
-        // Oracle (category) mapping: maps oracle names to IDs
-        this.oracleMapping = new Map();
-        this.oracleCategories = [];
+        // Diviner mapping: maps diviner names to IDs
+        this.divinerMapping = new Map();
+        this.divinerGroups = [];
         
-        // Divine counts per oracle category (number of prophecies per category)
-        this.divineDocCount = []; // Index: oracleId, Value: count
-        this.omenCount = [];      // Index: oracleId, Value: total omen count
-        this.omenFrequencies = []; // Index: oracleId, Value: Map<omenId, count>
+        // Divine document count per diviner category (number of prophecies per category)
+        this.divinerDocCount = []; // Index: divinerId, Value: count
+        this.omenCount = [];      // Index: divinerId, Value: total omen count
+        this.omenFrequencies = []; // Index: divinerId, Value: Map<omenId, count>
         
         // Omen mapping (n-grams representing omens in the prophecy)
         this.omenMapping = new Map();
         this.omens = [];
         this.omenDocFreq = [];    // Index: omenId, Value: global frequency
         
-        this.totalProphecies = 0; // Total number of prophecies inscribed
+        this.totalTransmissions = 0; // Total number of recorded prophecies
         this.capitalize = capitalize;
         this.excludes = new Set(excludes);
-        // Initialize the oracle (invoke the prophetic Trías)
+        // Initialize the oracle (invoke the prophetic Trias)
         this.initialized = this.init();
+    }
+
+    async condense(data) {
+        return await new Promise((resolve, reject) => {
+            zlib.gzip(data, (err, condensed) => {
+                if (err) reject(err);
+                resolve(condensed);
+            });
+        });
+    }
+
+    async expand(data) {
+        return await new Promise((resolve, reject) => {
+            zlib.gunzip(data, (err, expanded) => {
+                if (err) reject(err);
+                resolve(expanded);
+            });
+        });
     }
 
     /**
@@ -57,9 +75,6 @@ export class Trias {
      * 
      * Initializes the Trias oracle by cleansing the exclusion list with the stemmer
      * and loading the existing oracle tome.
-     *
-     * References:
-     * - Basic text pre-processing and model initialization techniques.
      */
     async init() {
         this.excludes = new Set([...this.excludes].map(exclude => this.stemmer.stem(exclude)));
@@ -69,15 +84,12 @@ export class Trias {
     /**
      * chant
      * 
-     * Prepares the omens (n-grams) from the given text.
-     * It tokenizes and stems the input text, filters out excluded terms,
+     * Prepares the omens (n-grams) from the provided text.
+     * It tokenizes the text, applies the stemmer, filters out excluded terms,
      * and generates n-grams up to the specified 'n' value.
      * 
      * @param {string} text - The input text to be processed.
      * @returns {string[]} - Array of omens (n-grams).
-     *
-     * References:
-     * - N-gram generation methods in natural language processing.
      */
     chant(text) {
         const tokens = this.stemmer.tokenizeAndStem(text).filter(token =>
@@ -96,28 +108,26 @@ export class Trias {
     /**
      * load
      * 
-     * Loads the oracle tome (model) from a compressed file, reconstructing all oracle categories
-     * and omen mappings. If the file does not exist and initialization is allowed, it resets the model.
-     *
-     * References:
-     * - Model persistence using JSON serialization and zlib compression.
+     * Loads the oracle tome (model) from a condensed file, reconstructing
+     * all diviner categories and omen mappings. If the file does not exist
+     * and initialization is allowed, the model is reset.
      */
     async load() {
         try {
-            const compressedData = await fs.promises.readFile(this.file);
-            const jsonStr = zlib.gunzipSync(compressedData).toString('utf8');
+            const condensedData = await fs.promises.readFile(this.file);
+            const jsonStr = await this.expand(condensedData);
             const oracleTome = JSON.parse(jsonStr);
 
-            // Load oracle category mapping
-            this.oracleCategories = oracleTome.idToCategory || [];
-            this.oracleMapping = new Map(this.oracleCategories.map((cat, id) => [cat, id]));
+            // Load the mapping of diviner categories
+            this.divinerGroups = oracleTome.idToCategory || [];
+            this.divinerMapping = new Map(this.divinerGroups.map((cat, id) => [cat, id]));
 
-            // Load omen mapping
+            // Load the mapping of omens
             this.omens = oracleTome.idToWord || [];
             this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
 
             // Convert numerical structures
-            this.divineDocCount = oracleTome.docCount ? Array(oracleTome.docCount.length).fill(0).map(Number) : [];
+            this.divinerDocCount = oracleTome.docCount ? Array(oracleTome.docCount.length).fill(0).map(Number) : [];
             this.omenCount = oracleTome.wordCount ? Array(oracleTome.wordCount.length).fill(0).map(Number) : [];
             this.omenDocFreq = oracleTome.docFreq ? Array(oracleTome.docFreq.length).fill(0).map(Number) : [];
 
@@ -130,12 +140,12 @@ export class Trias {
                 }
             }
 
-            this.totalProphecies = Number(oracleTome.totalDocs) || 0;
+            this.totalTransmissions = Number(oracleTome.totalDocs) || 0;
             this.weightExponent = Number(oracleTome.weightExponent) || 2;
 
             // Update average omen size
             if (this.omens.length > 0) {
-                this.avgOmenSize = compressedData.length / this.omens.length;
+                this.avgOmenSize = condensedData.length / this.omens.length;
             }
         } catch (err) {
             if (err.code === 'ENOENT' && this.initIfMissing) {
@@ -149,25 +159,9 @@ export class Trias {
     /**
      * purgeLesserOmens
      * 
-     * Reduces the model size by removing the least frequent omens if the compressed model exceeds maxModelSize.
-     * The estimation is performed by compressing the JSON representation.
-     *
-     * References:
-     * - Model size reduction techniques in text classification.
+     * Reduces the model size by removing the least frequent omens if the condensed model exceeds maxModelSize.
      */
     async purgeLesserOmens() {
-        const oracleTome = {
-            idToCategory: this.oracleCategories,
-            idToWord: this.omens,
-            docCount: this.divineDocCount,
-            wordCount: this.omenCount,
-            docFreq: this.omenDocFreq,
-            wordFreq: this.omenFrequencies.map(map => Object.fromEntries(map)),
-            totalDocs: this.totalProphecies,
-            weightExponent: this.weightExponent,
-            avgWordSize: this.avgOmenSize
-        };
-
         const currentSize = await this.size();
         if (currentSize < this.maxModelSize) return;
 
@@ -193,21 +187,21 @@ export class Trias {
             newOmenMapping.set(this.omens[i], newIndex);
         }
 
-        // Update each oracle category's omen frequencies
-        for (let oracleId = 0; oracleId < this.omenFrequencies.length; oracleId++) {
-            const oldMap = this.omenFrequencies[oracleId];
+        // Update each diviner category's omen frequencies
+        for (let divinerId = 0; divinerId < this.omenFrequencies.length; divinerId++) {
+            const oldMap = this.omenFrequencies[divinerId];
             const newMap = new Map();
             for (const [omenId, count] of oldMap.entries()) {
                 if (mapping.has(omenId)) {
                     newMap.set(mapping.get(omenId), count);
                 }
             }
-            this.omenFrequencies[oracleId] = newMap;
+            this.omenFrequencies[divinerId] = newMap;
             let newTotal = 0;
             for (const count of newMap.values()) {
                 newTotal += count;
             }
-            this.omenCount[oracleId] = newTotal;
+            this.omenCount[divinerId] = newTotal;
         }
 
         // Update global omen structures
@@ -219,24 +213,21 @@ export class Trias {
     /**
      * save
      * 
-     * Serializes and writes the oracle tome (model) to the compressed file.
+     * Serializes and writes the oracle tome (model) to the condensed file.
      * It first purges lesser omens if necessary.
-     *
-     * References:
-     * - Data serialization and persistence using JSON and zlib.
      */
     async save() {
         await this.initialized;
-        this.purgeLesserOmens();
+        await this.purgeLesserOmens();
 
         const oracleTome = {
-            idToCategory: this.oracleCategories,
+            idToCategory: this.divinerGroups,
             idToWord: this.omens,
-            docCount: this.divineDocCount,
+            docCount: this.divinerDocCount,
             wordCount: this.omenCount,
             docFreq: this.omenDocFreq,
             wordFreq: this.omenFrequencies.map(map => Object.fromEntries(map)),
-            totalDocs: this.totalProphecies,
+            totalDocs: this.totalTransmissions,
             weightExponent: this.weightExponent
         };
 
@@ -245,9 +236,11 @@ export class Trias {
         }
 
         const jsonStr = JSON.stringify(oracleTome);
-        const compressedData = zlib.gzipSync(jsonStr);
-        await fs.promises.writeFile(this.file, compressedData);
-        this.avgOmenSize = compressedData.length / this.omens.length;
+        const condensedData = await this.condense(jsonStr);
+        
+        await fs.promises.mkdir(path.dirname(this.file), { recursive: true }).catch(() => {});
+        await fs.promises.writeFile(this.file, condensedData);
+        this.avgOmenSize = condensedData.length / this.omens.length;
     }
 
     /**
@@ -256,42 +249,55 @@ export class Trias {
      * Resets the oracle tome (model) to an empty state.
      */
     reset() {
-        this.oracleMapping = new Map();
-        this.oracleCategories = [];
+        this.divinerMapping = new Map();
+        this.divinerGroups = [];
         this.omenMapping = new Map();
         this.omens = [];
-        this.divineDocCount = [];
+        this.divinerDocCount = [];
         this.omenCount = [];
         this.omenFrequencies = [];
         this.omenDocFreq = [];
-        this.totalProphecies = 0;
+        this.totalTransmissions = 0;
         this.avgOmenSize = null;
     }
 
     /**
      * learn
      * 
-     * Records a new prophecy (text) under a specified oracle category.
-     * It registers new categories as needed, extracts omens from the text,
+     * Records a new prophecy (text) under a specified diviner category.
+     * Registers new categories as needed, extracts omens from the text,
      * and updates frequencies and counts.
      * 
-     * @param {string} text - The prophetic text.
-     * @param {string} category - The oracle category for the prophecy.
-     *
-     * References:
-     * - Techniques for supervised text classification using TF-IDF.
+     * @param {string | object} text - The prophetic text. You can also provide an object with an `input` property (string) and an `output` property (string).
+     * @param {string} category - The diviner category for the prophecy.
      */
     async learn(text, category) {
+        if (Array.isArray(text)) {
+            for (const t of text) {
+                if(category) {
+                    await this.learn(t, category);
+                } else {
+                    await this.learn(t.input, t.output);
+                }
+            }
+            return;
+        }
+
+        if (typeof(text) === 'object' && typeof(text.input) === 'string') {
+            text = text.input;
+            category = text.output;
+        }
+
         await this.initialized;
-        if (!this.oracleMapping.has(category)) {
-            const oracleId = this.oracleCategories.length;
-            this.oracleMapping.set(category, oracleId);
-            this.oracleCategories.push(category);
-            this.divineDocCount[oracleId] = 0;
+        if (!this.divinerMapping.has(category)) {
+            const oracleId = this.divinerGroups.length;
+            this.divinerMapping.set(category, oracleId);
+            this.divinerGroups.push(category);
+            this.divinerDocCount[oracleId] = 0;
             this.omenCount[oracleId] = 0;
             this.omenFrequencies[oracleId] = new Map();
         }
-        const oracleId = this.oracleMapping.get(category);
+        const oracleId = this.divinerMapping.get(category);
 
         const omensList = this.chant(text);
         const uniqueOmens = new Set(omensList);
@@ -312,45 +318,42 @@ export class Trias {
             this.omenDocFreq[omenId]++;
         }
 
-        // Update oracle category counts
-        this.divineDocCount[oracleId]++;
+        // Update the diviner category counts
+        this.divinerDocCount[oracleId]++;
         for (const omen of omensList) {
             const omenId = this.omenMapping.get(omen);
             const current = this.omenFrequencies[oracleId].get(omenId) || 0;
             this.omenFrequencies[oracleId].set(omenId, current + 1);
             this.omenCount[oracleId]++;
         }
-        this.totalProphecies++;
+        this.totalTransmissions++;
     }
 
     /**
      * size
      * 
-     * Computes the estimated size of the compressed oracle tome (model).
+     * Computes the estimated size of the condensed oracle tome (model).
      * Forces recalculation if necessary.
      * 
-     * @param {boolean} force - If true, force recalculation of the average omen size.
+     * @param {boolean} force - If true, forces recalculation of the average omen size.
      * @returns {number} - Estimated total size in bytes.
-     *
-     * References:
-     * - Model size estimation techniques in data compression.
      */
     async size(force = false) {
         await this.initialized;
         if (typeof this.avgOmenSize !== 'number' || this.avgOmenSize <= 0 || force) {
             const oracleTome = {
-                idToCategory: this.oracleCategories,
+                idToCategory: this.divinerGroups,
                 idToWord: this.omens,
-                docCount: this.divineDocCount,
+                docCount: this.divinerDocCount,
                 wordCount: this.omenCount,
                 docFreq: this.omenDocFreq,
                 wordFreq: this.omenFrequencies.map(map => Object.fromEntries(map)),
-                totalDocs: this.totalProphecies,
+                totalDocs: this.totalTransmissions,
                 weightExponent: this.weightExponent
             };
             const jsonStr = JSON.stringify(oracleTome);
-            const compressedData = zlib.gzipSync(jsonStr);
-            this.avgOmenSize = compressedData.length / this.omens.length;
+            const condensedData = await this.condense(jsonStr);
+            this.avgOmenSize = condensedData.length / this.omens.length;
         }
         return this.avgOmenSize * this.omens.length;
     }
@@ -362,47 +365,57 @@ export class Trias {
      * Adjusts scores to prevent distortions.
      * 
      * @param {Object[]} results - Array of result objects with { category, score }.
-     * @param {number} limit - Maximum number of results to return.
+     * @param {Object} options - Options object with:
+     *   - `as` (string): Desired output format ('string', 'array', or 'objects').
+     *   - `limit` (number): Maximum number of results to return.
      * @returns {Object[]} - Normalized and sorted results.
-     *
-     * References:
-     * - Output normalization in probabilistic text classification.
      */
-    norm(results, limit = 5) {
-        if (results.length === 0) return [];
-        if (this.capitalize) {
+    norm(results, options = {as: 'string', limit: 5}) {
+        if (results.length) {
+            if (this.capitalize) {
+                results.forEach(result => {
+                    result.category = result.category.charAt(0).toUpperCase() + result.category.slice(1);
+                });
+            }
+            const minScore = Math.min(...results.map(r => r.score));
+            const maxScore = Math.max(...results.map(r => r.score));
+            const range = maxScore - minScore || 1;
             results.forEach(result => {
-                result.category = result.category.charAt(0).toUpperCase() + result.category.slice(1);
+                result.score = ((result.score - minScore) / range) * 0.99 + 0.01;
             });
+            results = results.sort((a, b) => b.score - a.score);
+            if (options.limit) {
+                results = results.slice(0, options.limit);
+            }
         }
-        const minScore = Math.min(...results.map(r => r.score));
-        const maxScore = Math.max(...results.map(r => r.score));
-        const range = maxScore - minScore || 1;
-        results.forEach(result => {
-            result.score = ((result.score - minScore) / range) * 0.99 + 0.01;
-        });
-        return results.sort((a, b) => b.score - a.score).slice(0, limit);
+        switch (options.as) {
+            case 'array':
+                return results.map(r => r.category);
+            case 'objects':                
+                return results;
+            default:
+                return results.map(r => r.category).join(', ');
+        }
     }
 
     /**
      * predict
      * 
-     * Predicts the oracle category (prophecy outcome) for the input text using a TF-IDF-based approach.
+     * Predicts the diviner category (prophecy outcome) for the input text using a TF-IDF-based approach.
      * Returns a list of predicted categories with normalized probability scores.
      * 
      * @param {string} text - The input text for which to predict a category.
-     * @param {number} limit - Maximum number of output categories.
+     * @param {Object} options - Options object with:
+     *   - `as` (string): Desired output format ('string', 'array', or 'objects').
+     *   - `limit` (number): Maximum number of results to return.
      * @returns {Object[]} - Array of objects: { category, score }.
-     *
-     * References:
-     * - TF-IDF and probabilistic classification methods.
      */
-    async predict(text, limit = 5) {
+    async predict(text, options = {as: 'string', limit: 1}) {
         await this.initialized;
-        if (this.totalProphecies === 0) return [];
+        if (this.totalTransmissions === 0) return this.norm([], options);
 
-        if(typeof text === 'object') {
-            return this.predictW(text, limit);
+        if (typeof text === 'object') {
+            return this.predictWeighted(text, options);
         }
 
         const omensList = this.chant(text);
@@ -416,16 +429,16 @@ export class Trias {
 
         const scores = new Map();
         let maxScore = -Infinity;
-        const totalProphecies = this.totalProphecies;
-        for (const [category, oracleId] of this.oracleMapping) {
-            const docsInCategory = this.divineDocCount[oracleId];
+        const totalTransmissions = this.totalTransmissions;
+        for (const [category, oracleId] of this.divinerMapping) {
+            const docsInCategory = this.divinerDocCount[oracleId];
             if (docsInCategory === 0) continue;
 
-            const logPrior = Math.log(docsInCategory / totalProphecies);
+            const logPrior = Math.log(docsInCategory / totalTransmissions);
             let logLikelihood = 0;
             idFreq.forEach((tf, omenId) => {
                 const df = this.omenDocFreq[omenId] || 0;
-                const idf = Math.log((totalProphecies + 1) / (df + 1)); // Smoothing applied
+                const idf = Math.log((totalTransmissions + 1) / (df + 1)); // Smoothing applied
                 const tfidf = tf * idf;
                 const freq = this.omenFrequencies[oracleId].get(omenId) || 0;
                 const totalOmens = this.omenCount[oracleId];
@@ -447,30 +460,29 @@ export class Trias {
 
         return this.norm(
             results.map(r => ({ ...r, score: r.score / sumExp })),
-            limit
+            options
         );
     }
 
     /**
-     * predictW
+     * predictWeighted
      * 
      * Similar to predict but processes multiple texts with associated weights.
-     * It computes a weighted TF-IDF and predicts the oracle category accordingly.
+     * It computes a weighted TF-IDF and predicts the diviner category accordingly.
      * 
      * @param {Object} inputObj - An object mapping texts to their weights.
-     * @param {number} limit - Maximum number of output categories.
-     * @returns {Object[]} - Array of predicted categories with weighted normalized scores.
-     *
-     * References:
-     * - Weighted TF-IDF approaches in multi-document classification.
+     * @param {Object} options - Options object with:
+     *   - `as` (string): Desired output format ('string', 'array', or 'objects').
+     *   - `limit` (number): Maximum number of results to return.
+     * @returns {Object[]} - Array of predicted categories with normalized scores.
      */
-    async predictW(inputObj, limit = 5) {
+    async predictWeighted(inputObj, options) {
         await this.initialized;
-        if (this.totalProphecies === 0 || this.oracleCategories.length === 0) return [];
+        if (this.totalTransmissions === 0 || this.divinerGroups.length === 0) return [];
     
         const idFreq = new Map();
         const weightExponent = this.weightExponent;
-        const totalProphecies = this.totalProphecies;
+        const totalTransmissions = this.totalTransmissions;
     
         // Process each entry with its weight
         for (const [rawText, weight] of Object.entries(inputObj)) {
@@ -487,17 +499,17 @@ export class Trias {
         const tfIdf = new Map();
         idFreq.forEach((tf, omenId) => {
             const df = this.omenDocFreq[omenId] || 0;
-            const idf = Math.log((totalProphecies + 1) / (df + 1));
+            const idf = Math.log((totalTransmissions + 1) / (df + 1));
             tfIdf.set(omenId, tf * idf);
         });
     
-        // Calculate scores for each oracle category
+        // Calculate scores for each diviner category
         const scores = new Map();
         let maxScore = -Infinity;
-        for (const [category, oracleId] of this.oracleMapping) {
-            const docsInCategory = this.divineDocCount[oracleId];
+        for (const [category, oracleId] of this.divinerMapping) {
+            const docsInCategory = this.divinerDocCount[oracleId];
             if (docsInCategory === 0) continue;
-            const logPrior = Math.log(docsInCategory / totalProphecies);
+            const logPrior = Math.log(docsInCategory / totalTransmissions);
             let logLikelihood = 0;
             tfIdf.forEach((weight, omenId) => {
                 const freq = this.omenFrequencies[oracleId].get(omenId) || 0;
@@ -520,7 +532,7 @@ export class Trias {
     
         return this.norm(
             results.map(r => ({ ...r, score: r.score / sumExp })),
-            limit
+            options
         );
     }
 }

@@ -1,15 +1,15 @@
 {
   "name": "trias",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "license": "ISC",
   "author": "",
   "type": "module",
-  "main": "./dist/trias.js",
+  "main": "./dist/trias.cjs",
   "exports": {
     ".": {
-      "require": "./dist/trias.js",
-      "import": "./src/trias.js"
+      "require": "./dist/trias.cjs",
+      "import": "./src/trias.mjs"
     }
   },
   "scripts": {
