@@ -15,7 +15,7 @@ import zlib from 'zlib';
 export class Trias {
     constructor({
         file = './model.trias', // model file (the "tome of prophecies")
-        initIfMissing = true,
+        create = true,
         n = 3,
         language = 'en',
         weightExponent = 2,
@@ -25,7 +25,7 @@ export class Trias {
     } = {}) {
         this.file = file;
         this.weightExponent = weightExponent;
-        this.initIfMissing = initIfMissing;
+        this.create = create;
         this.n = n;
         this.stemmer = getStemmer(language);
         this.maxModelSize = size;
@@ -55,7 +55,7 @@ export class Trias {
     async condense(data) {
         return await new Promise((resolve, reject) => {
             zlib.gzip(data, (err, condensed) => {
-                if (err) reject(err);
+                if (err) return reject(err);
                 resolve(condensed);
             });
         });
@@ -64,7 +64,7 @@ export class Trias {
     async expand(data) {
         return await new Promise((resolve, reject) => {
             zlib.gunzip(data, (err, expanded) => {
-                if (err) reject(err);
+                if (err) return reject(err);
                 resolve(expanded);
             });
         });
@@ -77,7 +77,7 @@ export class Trias {
      * and loading the existing oracle tome.
      */
     async init() {
-        this.excludes = new Set([...this.excludes].map(exclude => this.stemmer.stem(exclude)));
+        this.excludes = new Set([...this.excludes].map(exclude => this.stemmer.stem(exclude)).filter(e => e));
         await this.load();
     }
 
@@ -112,11 +112,17 @@ export class Trias {
      * all diviner categories and omen mappings. If the file does not exist
      * and initialization is allowed, the model is reset.
      */
-    async load() {
+    async load(file=false) {
         try {
-            const condensedData = await fs.promises.readFile(this.file);
+            if (!file) {
+                file = this.file;
+            }
+
+            const condensedData = await fs.promises.readFile(file);
             const jsonStr = await this.expand(condensedData);
-            const oracleTome = JSON.parse(jsonStr);
+            if (!jsonStr) throw new Error('Decompressed data is empty');
+
+            const oracleTome = JSON.parse(jsonStr.toString('utf-8'));
 
             // Load the mapping of diviner categories
             this.divinerGroups = oracleTome.idToCategory || [];
@@ -127,9 +133,9 @@ export class Trias {
             this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
 
             // Convert numerical structures
-            this.divinerDocCount = oracleTome.docCount ? Array(oracleTome.docCount.length).fill(0).map(Number) : [];
-            this.omenCount = oracleTome.wordCount ? Array(oracleTome.wordCount.length).fill(0).map(Number) : [];
-            this.omenDocFreq = oracleTome.docFreq ? Array(oracleTome.docFreq.length).fill(0).map(Number) : [];
+            this.divinerDocCount = oracleTome.docCount ? oracleTome.docCount.map(Number) : [];
+            this.omenCount = oracleTome.wordCount ? oracleTome.wordCount.map(Number) : [];
+            this.omenDocFreq = oracleTome.docFreq ? oracleTome.docFreq.map(Number) : [];
 
             // Convert omen frequencies to Map
             this.omenFrequencies = [];
@@ -148,7 +154,7 @@ export class Trias {
                 this.avgOmenSize = condensedData.length / this.omens.length;
             }
         } catch (err) {
-            if (err.code === 'ENOENT' && this.initIfMissing) {
+            if (err.code === 'ENOENT' && this.create) {
                 this.reset();
             } else {
                 throw new Error(`Failed to load oracle tome: ${err.message}`);
@@ -157,16 +163,16 @@ export class Trias {
     }
 
     /**
-     * purgeLesserOmens
+     * purge
      * 
      * Reduces the model size by removing the least frequent omens if the condensed model exceeds maxModelSize.
      */
-    async purgeLesserOmens() {
+    async purge() {
         const currentSize = await this.size();
         if (currentSize < this.maxModelSize) return;
 
         const totalOmens = this.omens.length;
-        const targetOmenCount = Math.floor(totalOmens * (this.maxModelSize / currentSize));
+        const targetOmenCount = Math.max(1, Math.floor(totalOmens * (this.maxModelSize / currentSize)));
         const removalCount = totalOmens - targetOmenCount;
         if (removalCount <= 0) return;
 
@@ -216,9 +222,9 @@ export class Trias {
      * Serializes and writes the oracle tome (model) to the condensed file.
      * It first purges lesser omens if necessary.
      */
-    async save() {
+    async save(outputFile=false) {
         await this.initialized;
-        await this.purgeLesserOmens();
+        await this.purge();
 
         const oracleTome = {
             idToCategory: this.divinerGroups,
@@ -234,13 +240,18 @@ export class Trias {
         if (this.avgOmenSize !== null && this.omens.length > 0) {
             oracleTome.avgWordSize = this.avgOmenSize;
         }
+        if (!outputFile) {
+            outputFile = this.file;
+        }
 
         const jsonStr = JSON.stringify(oracleTome);
         const condensedData = await this.condense(jsonStr);
         
-        await fs.promises.mkdir(path.dirname(this.file), { recursive: true }).catch(() => {});
-        await fs.promises.writeFile(this.file, condensedData);
-        this.avgOmenSize = condensedData.length / this.omens.length;
+        await fs.promises.mkdir(path.dirname(outputFile), { recursive: true }).catch(() => {});
+        await fs.promises.writeFile(outputFile, condensedData);
+        if (this.omens.length > 0) {
+            this.avgOmenSize = condensedData.length / this.omens.length;
+        }
     }
 
     /**
@@ -262,7 +273,7 @@ export class Trias {
     }
 
     /**
-     * learn
+     * train
      * 
      * Records a new prophecy (text) under a specified diviner category.
      * Registers new categories as needed, extracts omens from the text,
@@ -271,21 +282,21 @@ export class Trias {
      * @param {string | object} text - The prophetic text. You can also provide an object with an `input` property (string) and an `output` property (string).
      * @param {string} category - The diviner category for the prophecy.
      */
-    async learn(text, category) {
+    async train(text, category) {
         if (Array.isArray(text)) {
             for (const t of text) {
                 if(category) {
-                    await this.learn(t, category);
+                    await this.train(t, category);
                 } else {
-                    await this.learn(t.input, t.output);
+                    await this.train(t.input, t.output);
                 }
             }
             return;
         }
 
         if (typeof(text) === 'object' && typeof(text.input) === 'string') {
-            text = text.input;
             category = text.output;
+            text = text.input;
         }
 
         await this.initialized;
@@ -327,6 +338,11 @@ export class Trias {
             this.omenCount[oracleId]++;
         }
         this.totalTransmissions++;
+        
+        const currentSize = await this.size();
+        if (currentSize > (1.5 * this.maxModelSize)) { // Purge lesser omens if the model is too large
+            await this.purge();
+        }
     }
 
     /**
@@ -340,6 +356,9 @@ export class Trias {
      */
     async size(force = false) {
         await this.initialized;
+        if (this.omens.length === 0) {
+            return 0;
+        }
         if (typeof this.avgOmenSize !== 'number' || this.avgOmenSize <= 0 || force) {
             const oracleTome = {
                 idToCategory: this.divinerGroups,

@@ -19,7 +19,7 @@ import path from 'path';
 
     (async function runTest() {
       console.log('Training model...');
-      await oracle.learn([
+      await oracle.train([
         {input: 'News Broadcast reporting the latest news of the day', output: 'News'},
         {input: 'Live Football, incredible play and full coverage', output: 'Sports'},
         {input: 'Latest in technology and revolutionary gadgets', output: 'Technology'},

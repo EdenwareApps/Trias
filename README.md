@@ -5,11 +5,17 @@
 - **Train and update its model in real-time**, allowing you to add training examples on the fly.
 - **Persist the trained model** in a compact, portable, and compressed file.
 
-Inspired by the ancient Greek prophetic nymphs known as the Trias, this tool reimagines divination for the digital age. Just as the Trias interpreted omens to foresee the future, Trias processes large streams of text to generate insightful predictions.
+Inspired by the ancient Greek prophetic nymphs known as the Trias (Cleodora, Melaina and Daphnis), this tool reimagines divination for the digital age. Just as the Trias interpreted omens to foresee the future, Trias processes large streams of text to generate insightful predictions.
 
-<a href="url"><img src="http://edenware.app/trias/images/trias.jpg" height="auto" width="600" style="border-radius: 20%" alt="Trias" title="Trias" /></a>
+<img src="http://edenware.app/trias/images/trias.jpg" height="auto" width="600" style="border-radius: 24px;" alt="Trias" title="Trias" />
+<style type="text/css">
+img#trias {
+    border-radius: 24px;
+}
+</style>
 
-**Note:** All Trias methods are asynchronous, so you can perform learning and prediction simultaneously without blocking your application.
+
+**Note:** All Trias methods are asynchronous, so you can perform additional training and prediction simultaneously without blocking your application.
 
 <br />  
 
@@ -55,7 +61,7 @@ Creating a new `Trias` instance.
 const trias = new Trias({
 
     file: './nevermind.trias', // Path to the model file
-    initIfMissing: true, // Initialize a new model if none exists
+    create: true, // Initialize a new model if none exists
     n: 3, // Maximum n-gram length (1-3)
     language: 'en', // ISO 2-letter code for the language (e.g., 'en' for English)
     excludes: ['separator', 'live', 'unknown'], // Terms to exclude
@@ -72,18 +78,18 @@ const trias = new Trias({
 Train Trias with text inputs and their corresponding categories asynchronously:
 
 ```javascript
-await trias.learn("The future holds great promise.", "optimistic");
-await trias.learn("Dark clouds loom on the horizon.", "pessimistic");
+await trias.train("The future holds great promise.", "optimistic");
+await trias.train("Dark clouds loom on the horizon.", "pessimistic");
 
 // Train multiple texts with their associated categories.
 // In this example, both texts will be linked to both "optimistic" and "utopic" categories.
-await trias.learn([
+await trias.train([
     "The future holds great promise.",
     "A rainbow looms on the horizon."
 ], ["optimistic", "utopic"]);
 
 // Alternatively, use object notation:
-await trias.learn([{
+await trias.train([{
     input: "Dark clouds loom on the horizon.",
     output: "pessimistic"
 }]);
@@ -138,7 +144,7 @@ await trias.save();
 
 #### Resetting
 
-Reset Trias by clearing all learned data:
+Reset Trias by clearing all trained data:
 
 
 ```javascript
@@ -156,7 +162,7 @@ trias.reset();
 | Option          | Type      | Default Value     | Description                                                        |
 |-----------------|-----------|-------------------|--------------------------------------------------------------------|
 | `file`          | `string`  | `'./model.trias'` | Path to the model file.                                            |
-| `initIfMissing` | `boolean` | `true`            | Automatically initialize a new model if the file is not found.     |
+| `create`        | `boolean` | `true`            | Automatically create a new model if the file is not found.     |
 | `n`             | `number`  | `3`               | Maximum n-gram length to generate (e.g., 1–3).                       |
 | `language`      | `string`  | `'en'`            | ISO 2-letter language code for stemming (e.g., `'en'` for English). |
 | `capitalize`    | `boolean` | `false`           | If true, capitalizes the category names in the prediction output.   |
@@ -168,7 +174,7 @@ trias.reset();
 #### Methods
 <br />
 
-#### `learn(text, category)`
+#### `train(text, category)`
 
 Train the instance with a new example.
 
@@ -200,7 +206,7 @@ Asynchronously saves the current state of the model to the designated file.
 
 #### `reset()`
 
-Clears all learned data and resets the model.
+Clears all trained data and resets the model.
 
 <br /> 
 
