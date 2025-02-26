@@ -8,7 +8,7 @@
 Inspired by the ancient Greek prophetic nymphs known as the Trias (Cleodora, Melaina and Daphnis), this tool reimagines divination for the digital age. Just as the Trias interpreted omens to foresee the future, Trias processes large streams of text to generate insightful predictions.
 
 <p align="center">
-    <img src="http://edenware.app/trias/images/trias.jpg" height="600" width="600" style="border-radius: 24px;" id="trias" alt="Trias" title="Trias" />
+    <img src="http://edenware.app/trias/images/trias-logo.jpg" height="440" width="600" style="border-radius: 24px;" id="trias" alt="Trias" title="Trias" />
 </p>
 
 
