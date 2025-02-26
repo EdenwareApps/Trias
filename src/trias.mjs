@@ -2,6 +2,7 @@ import { getStemmer } from './stemmer.mjs';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
+import axios from 'axios';
 
 /**
  * Trias class
@@ -20,13 +21,20 @@ export class Trias {
         language = 'en',
         weightExponent = 2,
         capitalize = false,
-        excludes = ['separator', 'separador', 'hd', 'hevc', 'sd', 'fullhd', 'fhd', 'channels', 'canais', 'aberto', 'abertos', 'world', 'países', 'paises', 'countries', 'ww', 'live', 'ao vivo', 'en vivo', 'directo', 'en directo', 'unknown', 'other', 'others'],
-        size = 4096 * 1024  // Approximate model size in bytes (limit for the prophetic tome)
+        excludes = [],
+        size = 4096 * 1024,  // Approximate model size in bytes (limit for the prophetic tome)
+        autoImport = false,  // Auto import pre-trained model if file doesn't exist
+        modelUrl = 'https://edenware.app/trias/trained/{language}.trias' // URL template for pre-trained model
     } = {}) {
+        
         this.file = file;
         this.weightExponent = weightExponent;
+        this.autoImport = autoImport;
+        this.modelUrl = modelUrl;
+        this.language = language;
         this.create = create;
         this.n = n;
+
         this.stemmer = getStemmer(language);
         this.maxModelSize = size;
         this.avgOmenSize = null;  // Average size per omen (calculated from condensed model file)
@@ -53,7 +61,7 @@ export class Trias {
     }
 
     async condense(data) {
-        return await new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             zlib.gzip(data, (err, condensed) => {
                 if (err) return reject(err);
                 resolve(condensed);
@@ -62,7 +70,7 @@ export class Trias {
     }
 
     async expand(data) {
-        return await new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             zlib.gunzip(data, (err, expanded) => {
                 if (err) return reject(err);
                 resolve(expanded);
@@ -74,11 +82,48 @@ export class Trias {
      * init
      * 
      * Initializes the Trias oracle by cleansing the exclusion list with the stemmer
-     * and loading the existing oracle tome.
+     * and loading the existing oracle tome. If autoImport is enabled and the file doesn't exist,
+     * it will attempt to download a pre-trained model.
      */
     async init() {
         this.excludes = new Set([...this.excludes].map(exclude => this.stemmer.stem(exclude)).filter(e => e));
-        await this.load();
+        
+        try {
+            await this.load();
+            
+            // Check if model is empty and autoImport is enabled
+            if (this.autoImport && this.totalTransmissions === 0) {
+                const url = this.modelUrl
+                    .replace('{language}', this.language)
+                    .replace('{file}', this.file);
+                    
+                try {
+                    await this.import(url);
+                } catch (err) {
+                    console.warn(`Failed to auto-import model from ${url}: ${err.message}`);
+                    if (!this.create) {
+                        throw err;
+                    }
+                }
+            }
+        } catch (err) {
+            if (this.autoImport && (err.code === 'ENOENT' || err.message.includes('Failed to load oracle tome'))) {
+                const url = this.modelUrl
+                    .replace('{language}', this.language)
+                    .replace('{file}', this.file);
+                    
+                try {
+                    await this.import(url);
+                } catch (importErr) {
+                    console.warn(`Failed to auto-import model from ${url}: ${importErr.message}`);
+                    if (!this.create) {
+                        throw importErr;
+                    }
+                }
+            } else if (!this.create) {
+                throw err;
+            }
+        }
     }
 
     /**
@@ -152,6 +197,11 @@ export class Trias {
             // Update average omen size
             if (this.omens.length > 0) {
                 this.avgOmenSize = condensedData.length / this.omens.length;
+                
+                const currentSize = this.estimateSize();
+                if (currentSize > (1.5 * this.maxModelSize)) { // Purge lesser omens if the model is too large
+                    await this.save(false, true); // will purge the model
+                }
             }
         } catch (err) {
             if (err.code === 'ENOENT' && this.create) {
@@ -163,12 +213,40 @@ export class Trias {
     }
 
     /**
+     * import
+     * 
+     * Imports a model from a remote URL and saves it as this.file.
+     * 
+     * @param {string} url - The URL of the remote model file.
+     */
+    async import(url) {
+        await fs.promises.mkdir(path.dirname(this.file), { recursive: true }).catch(() => {});
+        
+        const writer = fs.createWriteStream(this.file);
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream',
+            headers: {
+                'Accept-Encoding': 'gzip,deflate'
+            }
+        });
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+        await this.load().catch(console.error);
+    }
+
+    /**
      * purge
      * 
      * Reduces the model size by removing the least frequent omens if the condensed model exceeds maxModelSize.
      */
     async purge() {
-        const currentSize = await this.size();
+        const currentSize = this.estimateSize();
         if (currentSize < this.maxModelSize) return;
 
         const totalOmens = this.omens.length;
@@ -214,6 +292,17 @@ export class Trias {
         this.omens = newOmens;
         this.omenMapping = newOmenMapping;
         this.omenDocFreq = newDocFreq;
+        
+        return true;
+    }
+
+    async maybePurge(save=false) {
+        if (this.avgOmenSize) {
+            const currentSize = this.estimateSize();
+            if (currentSize > (1.5 * this.maxModelSize)) { // Purge lesser omens if the model is too large
+                await this[save ? 'save' : 'purge'](); // will purge the model
+            }
+        }
     }
 
     /**
@@ -222,8 +311,11 @@ export class Trias {
      * Serializes and writes the oracle tome (model) to the condensed file.
      * It first purges lesser omens if necessary.
      */
-    async save(outputFile=false) {
-        await this.initialized;
+    async save(outputFile=false, initializing=false) {
+        if(initializing !== true) {
+            await this.initialized;
+        }
+
         await this.purge();
 
         const oracleTome = {
@@ -339,9 +431,12 @@ export class Trias {
         }
         this.totalTransmissions++;
         
-        const currentSize = await this.size();
-        if (currentSize > (1.5 * this.maxModelSize)) { // Purge lesser omens if the model is too large
-            await this.purge();
+        if (this.avgOmenSize) { // only purge if the model has been trained
+            const currentSize = await this.size();
+            if (currentSize > (1.5 * this.maxModelSize)) { // Purge lesser omens if the model is too large
+                this.initialized = this.purge(); // purge, but don't save, make 'initialized' a blocking promise to prevent race condition
+                await this.initialized;
+            }
         }
     }
 
@@ -374,6 +469,11 @@ export class Trias {
             const condensedData = await this.condense(jsonStr);
             this.avgOmenSize = condensedData.length / this.omens.length;
         }
+        return this.estimateSize();
+    }
+
+    estimateSize() {
+        if(!this.avgOmenSize || !this.omens.length) return 0;
         return this.avgOmenSize * this.omens.length;
     }
 
@@ -476,7 +576,6 @@ export class Trias {
             sumExp += expScore;
             results.push({ category, score: expScore });
         });
-
         return this.norm(
             results.map(r => ({ ...r, score: r.score / sumExp })),
             options
@@ -553,5 +652,10 @@ export class Trias {
             results.map(r => ({ ...r, score: r.score / sumExp })),
             options
         );
+    }
+
+    async destroy() {
+        this.reset();
+        this.initialized = Promise.reject(new Error('Trias destroyed'));
     }
 }

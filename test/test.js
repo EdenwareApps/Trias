@@ -14,7 +14,10 @@ import path from 'path';
     const oracle = new Trias({
       file: modelFile,
       language: 'en',
-      capitalize: true
+      capitalize: true,
+      autoImport: false,
+      modelUrl: 'https://edenware.app/trias/trained/{language}.trias',
+      size: 512 * 1024 // 512kb
     });
 
     (async function runTest() {
