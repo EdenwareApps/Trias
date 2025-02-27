@@ -193,6 +193,13 @@ export class Trias {
 
     async train(text, category) {
         await this.initialized;
+        // check category agains this.excludes
+        if (category && this.excludes.has(category.trim().toLowerCase())) {
+            return;
+        } else if(Array.isArray(text)) {
+            text = text.filter(item => !this.excludes.has(item.output.trim().toLowerCase()));
+            if(text.length === 0) return;
+        }
         Training.trainText(text, category, this);
         if (this.size > (this.maxModelSize * 1.5)) {
             await this.purge();
