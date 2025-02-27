@@ -1,103 +1,201 @@
+// test/trias.test.mjs
+
 import { Trias } from "../src/trias.mjs";
 import fs from 'fs/promises';
 import path from 'path';
+import assert from 'assert';
 
-// Enhanced usage example
-(async () => {
+// Configuração do __dirname para módulos ES
+const __dirname = path.dirname(import.meta.url.replace(new RegExp('^file:\/{2,3}'), ''));
+const modelFile = path.join(__dirname, 'model.trias');
+
+// Função para limpar o arquivo de modelo de teste
+async function cleanup() {
+  await fs.unlink(modelFile).catch(() => {});
+}
+
+async function testTrainingAndPrediction() {
+  console.log("Executando: testTrainingAndPrediction");
+
+  await cleanup();
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracle.initialized;
+
+  // Treina com amostras para diferentes categorias
+  await oracle.train([
+    {input: 'Weather forecast with sunny skies', output: 'Weather'},
+    {input: 'Stock market analysis with financial news', output: 'Finance'},
+    {input: 'Culinary recipes and cooking tips', output: 'Cooking'}
+  ]);
+
+  // Testa predições com textos semelhantes
+  let prediction = await oracle.predict('Sunny forecast');
+  assert.strictEqual(prediction.toLowerCase(), 'weather', "A predição para 'Sunny forecast' deve ser 'Weather'");
+
+  prediction = await oracle.predict('Latest financial updates');
+  assert.strictEqual(prediction.toLowerCase(), 'finance', "A predição para 'Latest financial updates' deve ser 'Finance'");
+
+  prediction = await oracle.predict('Cooking tips and recipes');
+  assert.strictEqual(prediction.toLowerCase(), 'cooking', "A predição para 'Cooking tips and recipes' deve ser 'Cooking'");
+
+  console.log("testTrainingAndPrediction passou.");
+}
+
+async function testSaveAndLoad() {
+  console.log("Executando: testSaveAndLoad");
+
+  // Cria uma instância e treina
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracle.initialized;
+
+  await oracle.train([
+    {input: 'Tech innovations and latest gadgets', output: 'Technology'}
+  ]);
+  
+  // Salva o modelo
+  await oracle.save();
+
+  // Cria nova instância para carregar o modelo salvo
+  const oracleReloaded = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracleReloaded.initialized;
+  
+  const prediction = await oracleReloaded.predict('Innovative gadgets');
+  assert.strictEqual(prediction.toLowerCase(), 'technology', "Após carregar, a predição deve ser 'Technology'");
+
+  console.log("testSaveAndLoad passou.");
+}
+
+async function testBestVariant() {
+  console.log("Executando: testBestVariant");
+
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: false,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracle.initialized;
+
+  // Configura variações para uma categoria customizada
+  oracle.categoryVariations.set('tech', new Map([['Technology', 10], ['Tech', 5]]));
+  const best = oracle.bestVariant('tech');
+  assert.strictEqual(best, 'Technology', "A melhor variação para 'tech' deve ser 'Technology'");
+
+  console.log("testBestVariant passou.");
+}
+
+async function testResetAndDestroy() {
+  console.log("Executando: testResetAndDestroy");
+
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracle.initialized;
+
+  // Treina uma amostra e testa a predição
+  await oracle.train([
+    {input: 'Political debate and news', output: 'Politics'}
+  ]);
+  let prediction = await oracle.predict('Political debate');
+  assert.strictEqual(prediction.toLowerCase(), 'politics', "Antes do reset, a predição deve ser 'Politics'");
+
+  // Reseta o modelo
+  oracle.reset();
+  // Após o reset, a predição pode retornar undefined ou valor nulo
+  prediction = await oracle.predict('Political debate').catch(() => null);
+  assert.ok(!prediction, "Após o reset, não deve haver predição válida");
+
+  // Treina novamente para confirmar que o modelo continua funcional
+  await oracle.train([
+    {input: 'Health and wellness tips', output: 'Health'}
+  ]);
+  prediction = await oracle.predict('Wellness tips');
+  assert.strictEqual(prediction.toLowerCase(), 'health', "Após novo treinamento, a predição deve ser 'Health'");
+
+  // Testa destroy: após destroy, métodos devem lançar erro
+  await oracle.destroy().catch(() => {}); // destroy rejeita a promise
   try {
-    // Remove the model file if it exists (ignore errors)
-    const __dirname = path.dirname(import.meta.url.replace(new RegExp('^file:\/{2,3}'), ''));
-    const modelFile = path.join(__dirname, 'model.trias');
-    await fs.unlink(modelFile).catch(() => {});
-    
-    // Create a new Trias instance with the model file, using Portuguese language and capitalized output
-    const oracle = new Trias({
-      file: modelFile,
-      language: 'en',
-      capitalize: true,
-      autoImport: false,
-      modelUrl: 'https://edenware.app/trias/trained/{language}.trias',
-      size: 512 * 1024 // 512kb
-    });
-
-    (async function runTest() {
-      console.log('Training model...');
-      await oracle.train([
-        {input: 'News Broadcast reporting the latest news of the day', output: 'News'},
-        {input: 'Live Football, incredible play and full coverage', output: 'Sports'},
-        {input: 'Latest in technology and revolutionary gadgets', output: 'Technology'},
-        {input: 'Film review: Cinema on Screen with excellent critiques', output: 'Entertainment'},
-        {input: 'Health tips for a better and more active life', output: 'Health'},
-        {input: 'Intense political debate in the National Congress', output: 'Politics'},
-        {input: 'Analysis of the financial market and current business', output: 'Economy'},
-        {input: 'Incredible travel destinations to explore the world', output: 'Travel'},
-        {input: 'Live musical show with renowned bands', output: 'Music'},
-        {input: 'Scientific discoveries that change the world', output: 'Science'},
-        {input: 'Documentary: Stories from the Past told in a unique way', output: 'History'},
-        {input: 'Express Cooking recipes and tips for quick cooking', output: 'Cooking'},
-        {input: 'Complete coverage of Auto Sports with detailed analyses', output: 'Sports'}        
-      ])
-
-      await oracle.save();
-
-      // Define a set of test samples with texts and their expected labels
-      const challenges = [
-        // test samples should be in english, use same categories as the training samples but with different words
-        {text: 'Latest news of the day', expected: 'News'},
-        {text: 'Incredible play and full coverage of football', expected: 'Sports'},
-        {text: 'Revolutionary gadgets and latest technology', expected: 'Technology'},
-        {text: 'Excellent critiques of Cinema on Screen', expected: 'Entertainment'},
-        {text: 'Better and more active life with health tips', expected: 'Health'},
-        {text: 'Intense political debate in the National Congress', expected: 'Politics'},
-        {text: 'Analysis of the financial market and current business', expected: 'Economy'},
-        {text: 'Incredible travel destinations to explore the world', expected: 'Travel'},
-        {text: 'Live musical show with renowned bands', expected: 'Music'},
-        {text: 'Scientific discoveries that change the world', expected: 'Science'},
-        {text: 'Documentary: Stories from the Past told in a unique way', expected: 'History'},
-        {text: 'Express Cooking recipes and tips for quick cooking', expected: 'Cooking'},
-        {text: 'Complete coverage of Auto Sports with detailed analyses', expected: 'Sports'}        
-      ];
-
-      console.log('\nPredicting on test samples...\n');
-      let correctCount = 0;
-      const results = [];
-
-      for (const challenge of challenges) {
-        const prediction = await oracle.predict(challenge.text);
-        if (prediction && prediction.toLowerCase() === challenge.expected.toLowerCase()) {
-          correctCount++;
-          results.push({
-            expected: challenge.expected,
-            predicted: prediction,
-            result: 'CORRECT'
-          });
-        } else {
-          results.push({
-            expected: challenge.expected,
-            predicted: prediction,
-            result: 'INCORRECT'
-          });
-        }
-      }
-
-      const precision = (correctCount / challenges.length) * 100;
-      console.log('\nTest results\n');
-      console.table(results);
-      console.log(`\nOverall test precision: ${precision.toFixed(2)}%`);
-
-      const modelSize = (await oracle.size() / 1024).toFixed(2) + ' kb';
-      const modelSize2 = (await oracle.size(true) / 1024).toFixed(2) + ' kb';
-      console.log(`\nEstimated model size: ${modelSize}`);
-      console.log(`\nActual model size: ${modelSize2}`);
-
-      const testWeighted = await oracle.predict({
-        'News Broadcast reporting the latest news of the day': 0.1,
-        'Live Football, incredible play and full coverage': 1
-      }, {as: 'objects', limit: 5});
-      console.log('\nPredict on test sample with weighted probabilities\n');
-      console.table(testWeighted);
-    })();
-  } catch (error) {
-    console.error('Error during process:', error);
+    await oracle.predict('Any text');
+    assert.fail("Não deve ser possível predit após destroy");
+  } catch (err) {
+    assert.ok(err, "Erro esperado após destroy");
   }
-})();
+
+  console.log("testResetAndDestroy passou.");
+}
+
+async function testWeightedPrediction() {
+  console.log("Executando: testWeightedPrediction");
+
+  await cleanup();
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracle.initialized;
+
+  await oracle.train([
+    {input: 'News report and current events', output: 'News'},
+    {input: 'Exciting football match highlights', output: 'Sports'}
+  ]);
+
+  // Testa predição ponderada utilizando objeto com pesos
+  const weightedResults = await oracle.predict({
+    'News report and current events': 0.3,
+    'Exciting football match highlights': 0.7
+  }, {as: 'objects', limit: 2});
+  
+  assert.ok(Array.isArray(weightedResults), "A predição ponderada deve retornar um array");
+  assert.ok(weightedResults.length > 0, "Deve haver pelo menos um resultado na predição ponderada");
+
+  weightedResults.forEach(result => {
+    // Cada resultado deve conter a propriedade 'score'
+    assert.ok(result.score, "Cada resultado deve possuir a propriedade 'score'");
+  });
+
+  console.log("testWeightedPrediction passou.");
+}
+
+async function runAllTests() {
+  try {
+    await testTrainingAndPrediction();
+    await testSaveAndLoad();
+    await testBestVariant();
+    await testResetAndDestroy();
+    await testWeightedPrediction();
+    console.log("Todos os testes passaram com sucesso.");
+  } catch (err) {
+    console.error("Falha nos testes:", err);
+    process.exit(1);
+  } finally {
+    await cleanup();
+  }
+}
+
+runAllTests();

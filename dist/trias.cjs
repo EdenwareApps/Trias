@@ -58683,6 +58683,356 @@ const {
 } = axios;
 
 /**
+ * Compresses the input data using gzip.
+ * @param {string} data - Data to be compressed.
+ * @returns {Promise<Buffer>}
+ */
+function condense(data) {
+  return new Promise((resolve, reject) => {
+    zlib.gzip(data, (err, condensed) => {
+      if (err) return reject(err);
+      resolve(condensed);
+    });
+  });
+}
+
+/**
+ * Decompresses the input data using gunzip.
+ * @param {Buffer} data - Data to be decompressed.
+ * @returns {Promise<Buffer>}
+ */
+function expand(data) {
+  return new Promise((resolve, reject) => {
+    zlib.gunzip(data, (err, expanded) => {
+      if (err) return reject(err);
+      resolve(expanded);
+    });
+  });
+}
+
+/**
+ * Loads the model from a file, decompresses it, and restores its structure.
+ * @param {string} file - File path.
+ * @returns {Promise<Object>}
+ */
+async function loadModel(file) {
+  // Read and decompress the file content
+  const condensedData = await fs.promises.readFile(file);
+  const jsonStr = await expand(condensedData);
+  if (!jsonStr) throw new Error('Decompressed data is empty');
+
+  // Parse the JSON data
+  const data = JSON.parse(jsonStr.toString('utf-8'));
+
+  // Restore Maps from serialized arrays/objects
+  data.categoryStemToId = new Map(data.categoryStemToId);
+  data.categoryVariations = new Map(Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [stem, new Map(Object.entries(variations))]));
+
+  // Restore omenFrequencies as an array of Maps
+  if (data.omenFrequencies) {
+    data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
+  }
+  // 'omens' is expected to remain an array
+  return data;
+}
+
+/**
+ * Imports a model from a remote URL and saves it to the specified file.
+ * @param {string} url - Remote URL.
+ * @param {string} file - Destination file path.
+ */
+async function importModel(url, file) {
+  // Ensure the directory exists
+  await fs.promises.mkdir(path.dirname(file), {
+    recursive: true
+  }).catch(() => {});
+  const writer = fs.createWriteStream(file);
+  const response = await axios({
+    method: 'get',
+    url: url,
+    responseType: 'stream',
+    headers: {
+      'Accept-Encoding': 'gzip,deflate'
+    }
+  });
+  response.data.pipe(writer);
+  await new Promise((resolve, reject) => {
+    writer.on('finish', resolve);
+    writer.on('error', reject);
+  });
+}
+
+/**
+ * Saves the model data to a file after compressing it.
+ * @param {string} outputFile - Destination file path.
+ * @param {Object} data - Model data.
+ */
+async function saveModel(outputFile, data) {
+  // Normalize the data by converting Maps into serializable arrays/objects.
+  const normalizedData = {
+    ...data,
+    categoryStemToId: Array.from(data.categoryStemToId.entries()),
+    categoryVariations: Object.fromEntries([...data.categoryVariations.entries()].map(([stem, variations]) => [stem, Object.fromEntries(variations)])),
+    // Normalize omenFrequencies: convert each Map in the array to an object.
+    omenFrequencies: data.omenFrequencies ? data.omenFrequencies.map(map => Object.fromEntries(map)) : undefined
+    // 'omens' remains as an array.
+  };
+  const jsonStr = JSON.stringify(normalizedData);
+  const condensedData = await condense(jsonStr);
+  await fs.promises.mkdir(path.dirname(outputFile), {
+    recursive: true
+  }).catch(() => {});
+  await fs.promises.writeFile(outputFile, condensedData);
+}
+
+/**
+ * chant
+ * 
+ * Prepares the omens (n-grams) from the provided text.
+ * It tokenizes the text, applies the stemmer, filters out excluded terms,
+ * and generates n-grams up to the specified 'n' value.
+ * 
+ * @param {string} text - Input text.
+ * @param {Object} stemmer - Stemmer instance.
+ * @param {Set} excludes - Set of excluded tokens.
+ * @param {number} n - Maximum n-gram length.
+ * @returns {string[]} - Array of n-grams.
+ */
+function chant(text, stemmer, excludes, n) {
+  if (typeof text !== 'string') {
+    console.error('chant: text is not a string', text);
+    return [];
+  }
+  const tokens = stemmer.tokenizeAndStem(text).filter(token => !excludes.has(token) && token.length > 1);
+  const omensList = [];
+  for (let i = 1; i <= n; i++) {
+    for (let j = 0; j <= tokens.length - i; j++) {
+      omensList.push(tokens.slice(j, j + i).join(' '));
+    }
+  }
+  return omensList;
+}
+
+/**
+ * Trains the model with a given text and category.
+ * Updates the context (model state) accordingly.
+ * @param {string|Object} text - The prophetic text, or an object with { input, output }.
+ * @param {string} category - The diviner category for the prophecy.
+ * @param {Object} context - The training context (model state).
+ */
+function trainText(text, category, context) {
+  if (Array.isArray(text)) {
+    for (const t of text) {
+      if (category) {
+        trainText(t, category, context);
+      } else {
+        trainText(t.input, t.output, context);
+      }
+    }
+    return;
+  }
+  if (typeof text === 'object' && typeof text.input === 'string') {
+    category = text.output;
+    text = text.input;
+  }
+  const categoryStem = context.stemmer.stem(category);
+  if (context.excludes.has(categoryStem)) return;
+  if (!context.categoryStemToId.has(categoryStem)) {
+    const oracleId = context.divinerGroups.length;
+    context.categoryStemToId.set(categoryStem, oracleId);
+    context.divinerGroups.push(categoryStem);
+    context.categoryVariations.set(categoryStem, new Map());
+    context.categoryVariations.get(categoryStem).set(category, 1);
+    context.divinerDocCount[oracleId] = 0;
+    context.omenCount[oracleId] = 0;
+    context.omenFrequencies[oracleId] = new Map();
+  } else {
+    const variationCounts = context.categoryVariations.get(categoryStem);
+    variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
+  }
+  const oracleId = context.categoryStemToId.get(categoryStem);
+  const omensList = chant(text, context.stemmer, context.excludes, context.n);
+  if (omensList.length === 0) return;
+  const uniqueOmens = new Set(omensList);
+
+  // Register new omens
+  for (const omen of uniqueOmens) {
+    if (!context.omenMapping.has(omen)) {
+      const omenId = context.omens.length;
+      context.omenMapping.set(omen, omenId);
+      context.omens.push(omen);
+      context.omenDocFreq[omenId] = 0;
+    }
+  }
+
+  // Update global omen frequency
+  for (const omen of uniqueOmens) {
+    const omenId = context.omenMapping.get(omen);
+    context.omenDocFreq[omenId]++;
+  }
+
+  // Update the diviner category counts
+  context.divinerDocCount[oracleId]++;
+  for (const omen of omensList) {
+    const omenId = context.omenMapping.get(omen);
+    const current = context.omenFrequencies[oracleId].get(omenId) || 0;
+    context.omenFrequencies[oracleId].set(omenId, current + 1);
+    context.omenCount[oracleId]++;
+  }
+  context.totalTransmissions++;
+}
+
+/**
+ * Normalizes and sorts prediction results.
+ * @param {Object[]} results - Array of objects with { category, score }.
+ * @param {Object} options - Output options: { as: 'string'|'array'|'objects', limit: number }.
+ * @param {Function} bestVariantFn - Function to retrieve the best variant.
+ * @param {boolean} capitalize - Whether to capitalize categories.
+ * @returns {Object[]|string|string[]} - Formatted prediction results.
+ */
+function norm(results, options, bestVariantFn, capitalize) {
+  if (results.length) {
+    results.forEach(result => {
+      result.category = bestVariantFn(result.category);
+    });
+    if (capitalize) {
+      results.forEach(result => {
+        result.category = result.category.charAt(0).toUpperCase() + result.category.slice(1);
+      });
+    }
+    results.sort((a, b) => b.score - a.score);
+    if (options.limit) results = results.slice(0, options.limit);
+  }
+  switch (options.as) {
+    case 'array':
+      return results.map(r => r.category);
+    case 'objects':
+      return results;
+    default:
+      return results.map(r => r.category).join(', ');
+  }
+}
+
+/**
+ * Predicts the diviner category for the given text using a TF-IDF-based approach.
+ * @param {string} text - The input text.
+ * @param {Object} context - The model context.
+ * @returns {Object[]} - Array of objects with { category, score }.
+ */
+function predictText(text, context) {
+  if (context.totalTransmissions === 0) return [];
+  if (typeof text === 'object' && !Array.isArray(text)) {
+    return predictWeightedText(text, context);
+  }
+
+  // Tokenize text and compute term frequencies
+  const omensList = chant(text, context.stemmer, context.excludes, context.n);
+  const idFreq = new Map();
+  for (const omen of omensList) {
+    const omenId = context.omenMapping.get(omen);
+    if (omenId !== undefined) {
+      idFreq.set(omenId, (idFreq.get(omenId) || 0) + 1);
+    }
+  }
+  const scores = new Map();
+  let maxScore = -Infinity;
+  const totalTransmissions = context.totalTransmissions;
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    const docsInCategory = context.divinerDocCount[oracleId];
+    if (docsInCategory === 0) continue;
+    const logPrior = Math.log(docsInCategory / totalTransmissions);
+    let logLikelihood = 0;
+    idFreq.forEach((tf, omenId) => {
+      const df = context.omenDocFreq[omenId] || 0;
+      const idf = Math.log((totalTransmissions + 1) / (df + 1)); // Smoothing
+      const tfidf = tf * idf;
+      const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
+      const totalOmens = context.omenCount[oracleId];
+      const pOmen = (freq + 1) / (totalOmens + context.omens.length);
+      logLikelihood += tfidf * Math.log(pOmen);
+    });
+    const score = logPrior + logLikelihood;
+    scores.set(categoryStem, score);
+    if (score > maxScore) maxScore = score;
+  }
+  let sumExp = 0;
+  const results = [];
+  scores.forEach((score, category) => {
+    const expScore = Math.exp(score - maxScore);
+    sumExp += expScore;
+    results.push({
+      category,
+      score: expScore
+    });
+  });
+
+  // Normalize scores to sum to 1 (softmax)
+  return results.map(r => ({
+    ...r,
+    score: r.score / sumExp
+  }));
+}
+
+/**
+ * Predicts the diviner category for multiple texts with associated weights.
+ * @param {Object} inputObj - An object mapping texts to their weights.
+ * @param {Object} context - The model context.
+ * @returns {Object[]} - Array of objects with { category, score }.
+ */
+function predictWeightedText(inputObj, context) {
+  if (context.totalTransmissions === 0 || context.divinerGroups.length === 0) return [];
+  const idFreq = new Map();
+  const weightExponent = context.weightExponent;
+  const totalTransmissions = context.totalTransmissions;
+  for (const [rawText, weight] of Object.entries(inputObj)) {
+    const omensList = chant(rawText, context.stemmer, context.excludes, context.n);
+    for (const omen of omensList) {
+      const omenId = context.omenMapping.get(omen);
+      if (omenId === undefined) continue;
+      const weightedCount = Math.pow(weight, weightExponent);
+      idFreq.set(omenId, (idFreq.get(omenId) || 0) + weightedCount);
+    }
+  }
+  const tfIdf = new Map();
+  idFreq.forEach((tf, omenId) => {
+    const df = context.omenDocFreq[omenId] || 0;
+    const idf = Math.log((totalTransmissions + 1) / (df + 1));
+    tfIdf.set(omenId, tf * idf);
+  });
+  const scores = new Map();
+  let maxScore = -Infinity;
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    const docsInCategory = context.divinerDocCount[oracleId];
+    if (docsInCategory === 0) continue;
+    const logPrior = Math.log(docsInCategory / totalTransmissions);
+    let logLikelihood = 0;
+    tfIdf.forEach((weight, omenId) => {
+      const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
+      const totalOmens = context.omenCount[oracleId];
+      const pOmen = (freq + 1) / (totalOmens + context.omens.length);
+      logLikelihood += weight * Math.log(pOmen);
+    });
+    const score = logPrior + logLikelihood;
+    scores.set(categoryStem, score);
+    if (score > maxScore) maxScore = score;
+  }
+  let sumExp = 0;
+  const results = [];
+  scores.forEach((score, category) => {
+    const expScore = Math.exp(score - maxScore);
+    sumExp += expScore;
+    results.push({
+      category,
+      score: expScore
+    });
+  });
+  return results.map(r => ({
+    ...r,
+    score: r.score / sumExp
+  }));
+}
+
+/**
  * Trias class
  * 
  * Inspired by the ancient Greek Trias—the three prophetic nymphs (Cleodora, Melena, and Dafnis)
@@ -58718,300 +59068,223 @@ class Trias {
     this.maxModelSize = size;
     this.avgOmenSize = null; // Average size per omen (calculated from condensed model file)
 
-    // Diviner mapping: maps diviner names to IDs
-    this.divinerMapping = new Map();
+    // Model state variables
+    this.categoryStemToId = new Map();
+    this.categoryVariations = new Map();
     this.divinerGroups = [];
-
-    // Divine document count per diviner category (number of prophecies per category)
-    this.divinerDocCount = []; // Index: divinerId, Value: count
-    this.omenCount = []; // Index: divinerId, Value: total omen count
-    this.omenFrequencies = []; // Index: divinerId, Value: Map<omenId, count>
-
-    // Omen mapping (n-grams representing omens in the prophecy)
+    this.divinerDocCount = [];
+    this.omenCount = [];
+    this.omenFrequencies = [];
     this.omenMapping = new Map();
     this.omens = [];
-    this.omenDocFreq = []; // Index: omenId, Value: global frequency
-
-    this.totalTransmissions = 0; // Total number of recorded prophecies
+    this.omenDocFreq = [];
+    this.totalTransmissions = 0;
     this.capitalize = capitalize;
     this.excludes = new Set(excludes);
-    // Initialize the oracle (invoke the prophetic Trias)
+    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'stemmer', 'maxModelSize', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalTransmissions']);
     this.initialized = this.init();
   }
-  async condense(data) {
-    return new Promise((resolve, reject) => {
-      zlib.gzip(data, (err, condensed) => {
-        if (err) return reject(err);
-        resolve(condensed);
-      });
-    });
+  toJSON() {
+    const result = {};
+    for (const p of this.contextProperties) {
+      result[p] = this[p];
+    }
+    return result;
   }
-  async expand(data) {
-    return new Promise((resolve, reject) => {
-      zlib.gunzip(data, (err, expanded) => {
-        if (err) return reject(err);
-        resolve(expanded);
-      });
-    });
-  }
-
-  /**
-   * init
-   * 
-   * Initializes the Trias oracle by cleansing the exclusion list with the stemmer
-   * and loading the existing oracle tome. If autoImport is enabled and the file doesn't exist,
-   * it will attempt to download a pre-trained model.
-   */
   async init() {
-    this.excludes = new Set([...this.excludes].map(exclude => this.stemmer.stem(exclude)).filter(e => e));
     try {
-      await this.load();
-
-      // Check if model is empty and autoImport is enabled
-      if (this.autoImport && this.totalTransmissions === 0) {
-        const url = this.modelUrl.replace('{language}', this.language).replace('{file}', this.file);
-        try {
-          await this.import(url);
-        } catch (err) {
-          console.warn(`Failed to auto-import model from ${url}: ${err.message}`);
-          if (!this.create) {
-            throw err;
-          }
-        }
-      }
-    } catch (err) {
-      if (this.autoImport && (err.code === 'ENOENT' || err.message.includes('Failed to load oracle tome'))) {
-        const url = this.modelUrl.replace('{language}', this.language).replace('{file}', this.file);
-        try {
-          await this.import(url);
-        } catch (importErr) {
-          console.warn(`Failed to auto-import model from ${url}: ${importErr.message}`);
-          if (!this.create) {
-            throw importErr;
-          }
-        }
-      } else if (!this.create) {
-        throw err;
-      }
-    }
-  }
-
-  /**
-   * chant
-   * 
-   * Prepares the omens (n-grams) from the provided text.
-   * It tokenizes the text, applies the stemmer, filters out excluded terms,
-   * and generates n-grams up to the specified 'n' value.
-   * 
-   * @param {string} text - The input text to be processed.
-   * @returns {string[]} - Array of omens (n-grams).
-   */
-  chant(text) {
-    const tokens = this.stemmer.tokenizeAndStem(text).filter(token => !this.excludes.has(token) && token.length > 1);
-    const omensList = [];
-    for (let i = 1; i <= this.n; i++) {
-      for (let j = 0; j <= tokens.length - i; j++) {
-        omensList.push(tokens.slice(j, j + i).join(' '));
-      }
-    }
-    return omensList;
-  }
-
-  /**
-   * load
-   * 
-   * Loads the oracle tome (model) from a condensed file, reconstructing
-   * all diviner categories and omen mappings. If the file does not exist
-   * and initialization is allowed, the model is reset.
-   */
-  async load(file = false) {
-    try {
-      if (!file) {
-        file = this.file;
-      }
-      const condensedData = await fs.promises.readFile(file);
-      const jsonStr = await this.expand(condensedData);
-      if (!jsonStr) throw new Error('Decompressed data is empty');
-      const oracleTome = JSON.parse(jsonStr.toString('utf-8'));
-
-      // Load the mapping of diviner categories
-      this.divinerGroups = oracleTome.idToCategory || [];
-      this.divinerMapping = new Map(this.divinerGroups.map((cat, id) => [cat, id]));
-
-      // Load the mapping of omens
-      this.omens = oracleTome.idToWord || [];
-      this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
-
-      // Convert numerical structures
-      this.divinerDocCount = oracleTome.docCount ? oracleTome.docCount.map(Number) : [];
-      this.omenCount = oracleTome.wordCount ? oracleTome.wordCount.map(Number) : [];
-      this.omenDocFreq = oracleTome.docFreq ? oracleTome.docFreq.map(Number) : [];
-
-      // Convert omen frequencies to Map
-      this.omenFrequencies = [];
-      if (oracleTome.wordFreq) {
-        for (let i = 0; i < oracleTome.wordFreq.length; i++) {
-          const map = new Map(Object.entries(oracleTome.wordFreq[i]).map(([k, v]) => [Number(k), v]));
-          this.omenFrequencies[i] = map;
-        }
-      }
-      this.totalTransmissions = Number(oracleTome.totalDocs) || 0;
-      this.weightExponent = Number(oracleTome.weightExponent) || 2;
-
-      // Update average omen size
-      if (this.omens.length > 0) {
-        this.avgOmenSize = condensedData.length / this.omens.length;
-        const currentSize = this.estimateSize();
-        if (currentSize > 1.5 * this.maxModelSize) {
-          // Purge lesser omens if the model is too large
-          await this.save(false, true); // will purge the model
-        }
-      }
+      await this.load(this.file);
     } catch (err) {
       if (err.code === 'ENOENT' && this.create) {
         this.reset();
       } else {
-        throw new Error(`Failed to load oracle tome: ${err.message}`);
+        throw err;
       }
+    }
+
+    // Handle auto-import if enabled and the model is empty
+    if (this.autoImport && this.totalTransmissions === 0) {
+      const url = this.modelUrl.replace('{language}', this.language).replace('{file}', this.file);
+      try {
+        await importModel(url, this.file);
+        await this.load(this.file);
+      } catch (err) {
+        console.warn(`Failed to auto-import model from ${url}: ${err.message}`);
+        if (!this.create) {
+          throw err;
+        }
+      }
+    }
+    if (this.omens.length > 0) {
+      const {
+        size
+      } = await fs.promises.stat(this.file).catch(() => ({
+        size: 0
+      }));
+      this.avgOmenSize = size / this.omens.length;
     }
   }
 
   /**
-   * import
-   * 
-   * Imports a model from a remote URL and saves it as this.file.
-   * 
-   * @param {string} url - The URL of the remote model file.
+   * Loads the model from the given file and restores its internal structure.
    */
-  async import(url) {
-    await fs.promises.mkdir(path.dirname(this.file), {
-      recursive: true
-    }).catch(() => {});
-    const writer = fs.createWriteStream(this.file);
-    const response = await axios({
-      method: 'get',
-      url: url,
-      responseType: 'stream',
-      headers: {
-        'Accept-Encoding': 'gzip,deflate'
+  async load(modelFile) {
+    const model = await loadModel(modelFile);
+    this.divinerGroups = model.divinerGroups || [];
+    this.categoryStemToId = new Map(this.divinerGroups.map((stem, id) => [stem, id]));
+
+    // Restore categoryVariations, converting inner values to numbers
+    this.categoryVariations = new Map();
+    if (model.categoryVariations instanceof Map) {
+      for (const [stem, variations] of model.categoryVariations) {
+        const converted = new Map();
+        for (const [k, v] of variations) {
+          converted.set(k, Number(v));
+        }
+        this.categoryVariations.set(stem, converted);
       }
-    });
-    response.data.pipe(writer);
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-    });
-    await this.load().catch(console.error);
+    } else if (model.categoryVariations) {
+      for (const [stem, variations] of Object.entries(model.categoryVariations)) {
+        const converted = new Map();
+        for (const [k, v] of Object.entries(variations)) {
+          converted.set(k, Number(v));
+        }
+        this.categoryVariations.set(stem, converted);
+      }
+    }
+    this.omens = model.omens || [];
+    this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
+    this.divinerDocCount = model.divinerDocCount ? model.divinerDocCount.map(Number) : [];
+    this.omenCount = model.omenCount ? model.omenCount.map(Number) : [];
+    this.omenDocFreq = model.omenDocFreq ? model.omenDocFreq.map(Number) : [];
+
+    // Restore omenFrequencies as an array of Maps, converting keys to numbers
+    this.omenFrequencies = [];
+    if (model.omenFrequencies && Array.isArray(model.omenFrequencies)) {
+      for (let entry of model.omenFrequencies) {
+        let newMap = new Map();
+        if (entry instanceof Map) {
+          for (const [k, v] of entry) {
+            newMap.set(Number(k), v);
+          }
+        } else {
+          for (const [k, v] of Object.entries(entry)) {
+            newMap.set(Number(k), v);
+          }
+        }
+        this.omenFrequencies.push(newMap);
+      }
+    }
+    this.totalTransmissions = Number(model.totalTransmissions) || 0;
+    this.weightExponent = Number(model.weightExponent) || 2;
+    if (this.omens.length > 0) {
+      const {
+        size
+      } = await fs.promises.stat(modelFile).catch(() => ({
+        size: 0
+      }));
+      this.avgOmenSize = size / this.omens.length;
+      if (size > this.maxModelSize) {
+        await this.purge();
+      }
+    }
+    return true;
+  }
+  get size() {
+    if (this.avgOmenSize > 0) return this.omens.length * this.avgOmenSize;
+    return 0;
+  }
+  async train(text, category) {
+    await this.initialized;
+    trainText(text, category, this);
+    if (this.size > this.maxModelSize * 1.5) {
+      await this.purge();
+    }
+  }
+  async predict(text, options = {
+    as: 'string',
+    limit: 1
+  }) {
+    await this.initialized;
+    const results = predictText(text, this);
+    return norm(results, options, this.bestVariant.bind(this), this.capitalize);
+  }
+  bestVariant(stemmedCategory) {
+    const variationCounts = this.categoryVariations.get(stemmedCategory);
+    if (!variationCounts) return stemmedCategory;
+    let best = null;
+    let bestCount = -Infinity;
+    for (const [variation, count] of variationCounts.entries()) {
+      if (count > bestCount) {
+        best = variation;
+        bestCount = count;
+      }
+    }
+    return best;
   }
 
   /**
    * purge
    * 
-   * Reduces the model size by removing the least frequent omens if the condensed model exceeds maxModelSize.
+   * Reduces the model size by removing the least frequent omens so that the total
+   * number of omens does not exceed the allowed number defined by:
+   * 
+   *      allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize)
+   * 
+   * This ensures that the compressed model stays within the maximum size.
    */
   async purge() {
-    const currentSize = this.estimateSize();
-    if (currentSize < this.maxModelSize) return;
-    const totalOmens = this.omens.length;
-    const targetOmenCount = Math.max(1, Math.floor(totalOmens * (this.maxModelSize / currentSize)));
-    const removalCount = totalOmens - targetOmenCount;
-    if (removalCount <= 0) return;
-    const indices = Array.from({
-      length: totalOmens
-    }, (_, i) => i);
-    indices.sort((a, b) => (this.omenDocFreq[a] || 0) - (this.omenDocFreq[b] || 0));
-    const removeSet = new Set(indices.slice(0, removalCount));
+    // Calculate the allowed number of omens based on max model size and average omen size.
+    const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
+    if (this.omens.length <= allowedOmens) return;
+
+    // Create an array of omen indices paired with their frequency (from omenCount).
+    const omenFrequencyArray = this.omenCount.map((count, idx) => ({
+      idx,
+      count
+    }));
+
+    // Sort the array in descending order based on frequency.
+    omenFrequencyArray.sort((a, b) => b.count - a.count);
+
+    // Select indices of the top allowed omens.
+    const allowedIndices = new Set(omenFrequencyArray.slice(0, allowedOmens).map(item => item.idx));
+
+    // Build new arrays for omens, omenFrequencies, and omenCount based on allowed indices.
     const newOmens = [];
-    const newOmenMapping = new Map();
-    const newDocFreq = [];
-    const mapping = new Map(); // Map old index to new index
-    for (let i = 0; i < totalOmens; i++) {
-      if (removeSet.has(i)) continue;
-      const newIndex = newOmens.length;
-      mapping.set(i, newIndex);
-      newOmens.push(this.omens[i]);
-      newDocFreq.push(this.omenDocFreq[i]);
-      newOmenMapping.set(this.omens[i], newIndex);
+    const newOmenFrequencies = [];
+    const newOmenCount = [];
+    for (let i = 0; i < this.omens.length; i++) {
+      if (allowedIndices.has(i)) {
+        newOmens.push(this.omens[i]);
+        newOmenFrequencies.push(this.omenFrequencies[i]);
+        newOmenCount.push(this.omenCount[i]);
+      }
     }
 
-    // Update each diviner category's omen frequencies
-    for (let divinerId = 0; divinerId < this.omenFrequencies.length; divinerId++) {
-      const oldMap = this.omenFrequencies[divinerId];
-      const newMap = new Map();
-      for (const [omenId, count] of oldMap.entries()) {
-        if (mapping.has(omenId)) {
-          newMap.set(mapping.get(omenId), count);
-        }
-      }
-      this.omenFrequencies[divinerId] = newMap;
-      let newTotal = 0;
-      for (const count of newMap.values()) {
-        newTotal += count;
-      }
-      this.omenCount[divinerId] = newTotal;
-    }
-
-    // Update global omen structures
+    // Update the model's omen-related properties.
     this.omens = newOmens;
-    this.omenMapping = newOmenMapping;
-    this.omenDocFreq = newDocFreq;
-    return true;
-  }
-  async maybePurge(save = false) {
-    if (this.avgOmenSize) {
-      const currentSize = this.estimateSize();
-      if (currentSize > 1.5 * this.maxModelSize) {
-        // Purge lesser omens if the model is too large
-        await this[save ? 'save' : 'purge'](); // will purge the model
-      }
-    }
-  }
+    this.omenFrequencies = newOmenFrequencies;
+    this.omenCount = newOmenCount;
 
-  /**
-   * save
-   * 
-   * Serializes and writes the oracle tome (model) to the condensed file.
-   * It first purges lesser omens if necessary.
-   */
-  async save(outputFile = false, initializing = false) {
-    if (initializing !== true) {
-      await this.initialized;
-    }
+    // Rebuild the omenMapping based on the new omens array.
+    this.omenMapping = new Map(this.omens.map((omen, idx) => [omen, idx]));
+    await this.save();
+  }
+  async save() {
+    await this.initialized;
     await this.purge();
-    const oracleTome = {
-      idToCategory: this.divinerGroups,
-      idToWord: this.omens,
-      docCount: this.divinerDocCount,
-      wordCount: this.omenCount,
-      docFreq: this.omenDocFreq,
-      wordFreq: this.omenFrequencies.map(map => Object.fromEntries(map)),
-      totalDocs: this.totalTransmissions,
-      weightExponent: this.weightExponent
-    };
-    if (this.avgOmenSize !== null && this.omens.length > 0) {
-      oracleTome.avgWordSize = this.avgOmenSize;
-    }
-    if (!outputFile) {
-      outputFile = this.file;
-    }
-    const jsonStr = JSON.stringify(oracleTome);
-    const condensedData = await this.condense(jsonStr);
-    await fs.promises.mkdir(path.dirname(outputFile), {
-      recursive: true
-    }).catch(() => {});
-    await fs.promises.writeFile(outputFile, condensedData);
-    if (this.omens.length > 0) {
-      this.avgOmenSize = condensedData.length / this.omens.length;
-    }
+    await saveModel(this.file, this);
+    const {
+      size
+    } = await fs.promises.stat(this.file).catch(() => ({
+      size: 0
+    }));
+    this.avgOmenSize = size / this.omens.length;
   }
-
-  /**
-   * reset
-   * 
-   * Resets the oracle tome (model) to an empty state.
-   */
   reset() {
-    this.divinerMapping = new Map();
+    this.categoryStemToId = new Map();
+    this.categoryVariations = new Map();
     this.divinerGroups = [];
     this.omenMapping = new Map();
     this.omens = [];
@@ -59020,298 +59293,6 @@ class Trias {
     this.omenFrequencies = [];
     this.omenDocFreq = [];
     this.totalTransmissions = 0;
-    this.avgOmenSize = null;
-  }
-
-  /**
-   * train
-   * 
-   * Records a new prophecy (text) under a specified diviner category.
-   * Registers new categories as needed, extracts omens from the text,
-   * and updates frequencies and counts.
-   * 
-   * @param {string | object} text - The prophetic text. You can also provide an object with an `input` property (string) and an `output` property (string).
-   * @param {string} category - The diviner category for the prophecy.
-   */
-  async train(text, category) {
-    if (Array.isArray(text)) {
-      for (const t of text) {
-        if (category) {
-          await this.train(t, category);
-        } else {
-          await this.train(t.input, t.output);
-        }
-      }
-      return;
-    }
-    if (typeof text === 'object' && typeof text.input === 'string') {
-      category = text.output;
-      text = text.input;
-    }
-    await this.initialized;
-    if (!this.divinerMapping.has(category)) {
-      const oracleId = this.divinerGroups.length;
-      this.divinerMapping.set(category, oracleId);
-      this.divinerGroups.push(category);
-      this.divinerDocCount[oracleId] = 0;
-      this.omenCount[oracleId] = 0;
-      this.omenFrequencies[oracleId] = new Map();
-    }
-    const oracleId = this.divinerMapping.get(category);
-    const omensList = this.chant(text);
-    const uniqueOmens = new Set(omensList);
-
-    // Register new omens
-    for (const omen of uniqueOmens) {
-      if (!this.omenMapping.has(omen)) {
-        const omenId = this.omens.length;
-        this.omenMapping.set(omen, omenId);
-        this.omens.push(omen);
-        this.omenDocFreq[omenId] = 0;
-      }
-    }
-
-    // Update global omen frequency
-    for (const omen of uniqueOmens) {
-      const omenId = this.omenMapping.get(omen);
-      this.omenDocFreq[omenId]++;
-    }
-
-    // Update the diviner category counts
-    this.divinerDocCount[oracleId]++;
-    for (const omen of omensList) {
-      const omenId = this.omenMapping.get(omen);
-      const current = this.omenFrequencies[oracleId].get(omenId) || 0;
-      this.omenFrequencies[oracleId].set(omenId, current + 1);
-      this.omenCount[oracleId]++;
-    }
-    this.totalTransmissions++;
-    if (this.avgOmenSize) {
-      // only purge if the model has been trained
-      const currentSize = await this.size();
-      if (currentSize > 1.5 * this.maxModelSize) {
-        // Purge lesser omens if the model is too large
-        this.initialized = this.purge(); // purge, but don't save, make 'initialized' a blocking promise to prevent race condition
-        await this.initialized;
-      }
-    }
-  }
-
-  /**
-   * size
-   * 
-   * Computes the estimated size of the condensed oracle tome (model).
-   * Forces recalculation if necessary.
-   * 
-   * @param {boolean} force - If true, forces recalculation of the average omen size.
-   * @returns {number} - Estimated total size in bytes.
-   */
-  async size(force = false) {
-    await this.initialized;
-    if (this.omens.length === 0) {
-      return 0;
-    }
-    if (typeof this.avgOmenSize !== 'number' || this.avgOmenSize <= 0 || force) {
-      const oracleTome = {
-        idToCategory: this.divinerGroups,
-        idToWord: this.omens,
-        docCount: this.divinerDocCount,
-        wordCount: this.omenCount,
-        docFreq: this.omenDocFreq,
-        wordFreq: this.omenFrequencies.map(map => Object.fromEntries(map)),
-        totalDocs: this.totalTransmissions,
-        weightExponent: this.weightExponent
-      };
-      const jsonStr = JSON.stringify(oracleTome);
-      const condensedData = await this.condense(jsonStr);
-      this.avgOmenSize = condensedData.length / this.omens.length;
-    }
-    return this.estimateSize();
-  }
-  estimateSize() {
-    if (!this.avgOmenSize || !this.omens.length) return 0;
-    return this.avgOmenSize * this.omens.length;
-  }
-
-  /**
-   * norm
-   * 
-   * Normalizes and sorts the oracle prediction results.
-   * Adjusts scores to prevent distortions.
-   * 
-   * @param {Object[]} results - Array of result objects with { category, score }.
-   * @param {Object} options - Options object with:
-   *   - `as` (string): Desired output format ('string', 'array', or 'objects').
-   *   - `limit` (number): Maximum number of results to return.
-   * @returns {Object[]} - Normalized and sorted results.
-   */
-  norm(results, options = {
-    as: 'string',
-    limit: 5
-  }) {
-    if (results.length) {
-      if (this.capitalize) {
-        results.forEach(result => {
-          result.category = result.category.charAt(0).toUpperCase() + result.category.slice(1);
-        });
-      }
-      const minScore = Math.min(...results.map(r => r.score));
-      const maxScore = Math.max(...results.map(r => r.score));
-      const range = maxScore - minScore || 1;
-      results.forEach(result => {
-        result.score = (result.score - minScore) / range * 0.99 + 0.01;
-      });
-      results = results.sort((a, b) => b.score - a.score);
-      if (options.limit) {
-        results = results.slice(0, options.limit);
-      }
-    }
-    switch (options.as) {
-      case 'array':
-        return results.map(r => r.category);
-      case 'objects':
-        return results;
-      default:
-        return results.map(r => r.category).join(', ');
-    }
-  }
-
-  /**
-   * predict
-   * 
-   * Predicts the diviner category (prophecy outcome) for the input text using a TF-IDF-based approach.
-   * Returns a list of predicted categories with normalized probability scores.
-   * 
-   * @param {string} text - The input text for which to predict a category.
-   * @param {Object} options - Options object with:
-   *   - `as` (string): Desired output format ('string', 'array', or 'objects').
-   *   - `limit` (number): Maximum number of results to return.
-   * @returns {Object[]} - Array of objects: { category, score }.
-   */
-  async predict(text, options = {
-    as: 'string',
-    limit: 1
-  }) {
-    await this.initialized;
-    if (this.totalTransmissions === 0) return this.norm([], options);
-    if (typeof text === 'object') {
-      return this.predictWeighted(text, options);
-    }
-    const omensList = this.chant(text);
-    const idFreq = new Map();
-    for (const omen of omensList) {
-      const omenId = this.omenMapping.get(omen);
-      if (omenId !== undefined) {
-        idFreq.set(omenId, (idFreq.get(omenId) || 0) + 1);
-      }
-    }
-    const scores = new Map();
-    let maxScore = -Infinity;
-    const totalTransmissions = this.totalTransmissions;
-    for (const [category, oracleId] of this.divinerMapping) {
-      const docsInCategory = this.divinerDocCount[oracleId];
-      if (docsInCategory === 0) continue;
-      const logPrior = Math.log(docsInCategory / totalTransmissions);
-      let logLikelihood = 0;
-      idFreq.forEach((tf, omenId) => {
-        const df = this.omenDocFreq[omenId] || 0;
-        const idf = Math.log((totalTransmissions + 1) / (df + 1)); // Smoothing applied
-        const tfidf = tf * idf;
-        const freq = this.omenFrequencies[oracleId].get(omenId) || 0;
-        const totalOmens = this.omenCount[oracleId];
-        const pOmen = (freq + 1) / (totalOmens + this.omens.length);
-        logLikelihood += tfidf * Math.log(pOmen);
-      });
-      const score = logPrior + logLikelihood;
-      scores.set(category, score);
-      maxScore = Math.max(maxScore, score);
-    }
-    let sumExp = 0;
-    const results = [];
-    scores.forEach((score, category) => {
-      const expScore = Math.exp(score - maxScore);
-      sumExp += expScore;
-      results.push({
-        category,
-        score: expScore
-      });
-    });
-    return this.norm(results.map(r => ({
-      ...r,
-      score: r.score / sumExp
-    })), options);
-  }
-
-  /**
-   * predictWeighted
-   * 
-   * Similar to predict but processes multiple texts with associated weights.
-   * It computes a weighted TF-IDF and predicts the diviner category accordingly.
-   * 
-   * @param {Object} inputObj - An object mapping texts to their weights.
-   * @param {Object} options - Options object with:
-   *   - `as` (string): Desired output format ('string', 'array', or 'objects').
-   *   - `limit` (number): Maximum number of results to return.
-   * @returns {Object[]} - Array of predicted categories with normalized scores.
-   */
-  async predictWeighted(inputObj, options) {
-    await this.initialized;
-    if (this.totalTransmissions === 0 || this.divinerGroups.length === 0) return [];
-    const idFreq = new Map();
-    const weightExponent = this.weightExponent;
-    const totalTransmissions = this.totalTransmissions;
-
-    // Process each entry with its weight
-    for (const [rawText, weight] of Object.entries(inputObj)) {
-      const omensList = this.chant(rawText);
-      for (const omen of omensList) {
-        const omenId = this.omenMapping.get(omen);
-        if (omenId === undefined) continue;
-        const weightedCount = Math.pow(weight, weightExponent);
-        idFreq.set(omenId, (idFreq.get(omenId) || 0) + weightedCount);
-      }
-    }
-
-    // Calculate weighted TF-IDF
-    const tfIdf = new Map();
-    idFreq.forEach((tf, omenId) => {
-      const df = this.omenDocFreq[omenId] || 0;
-      const idf = Math.log((totalTransmissions + 1) / (df + 1));
-      tfIdf.set(omenId, tf * idf);
-    });
-
-    // Calculate scores for each diviner category
-    const scores = new Map();
-    let maxScore = -Infinity;
-    for (const [category, oracleId] of this.divinerMapping) {
-      const docsInCategory = this.divinerDocCount[oracleId];
-      if (docsInCategory === 0) continue;
-      const logPrior = Math.log(docsInCategory / totalTransmissions);
-      let logLikelihood = 0;
-      tfIdf.forEach((weight, omenId) => {
-        const freq = this.omenFrequencies[oracleId].get(omenId) || 0;
-        const totalOmens = this.omenCount[oracleId];
-        const pOmen = (freq + 1) / (totalOmens + this.omens.length);
-        logLikelihood += weight * Math.log(pOmen);
-      });
-      const score = logPrior + logLikelihood;
-      scores.set(category, score);
-      maxScore = Math.max(maxScore, score);
-    }
-    let sumExp = 0;
-    const results = [];
-    scores.forEach((score, category) => {
-      const expScore = Math.exp(score - maxScore);
-      sumExp += expScore;
-      results.push({
-        category,
-        score: expScore
-      });
-    });
-    return this.norm(results.map(r => ({
-      ...r,
-      score: r.score / sumExp
-    })), options);
   }
   async destroy() {
     this.reset();
