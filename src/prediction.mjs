@@ -79,7 +79,7 @@ export function predictText(text, context) {
   }
 
   // Tokenize text and compute term frequencies
-  const omensList = chant(text, context.stemmer, context.excludes, context.n);
+  const omensList = chant(text, context);
   const idFreq = new Map();
   for (const omen of omensList) {
     const omenId = context.omenMapping.get(omen);
@@ -92,19 +92,25 @@ export function predictText(text, context) {
   let maxScore = -Infinity;
   const totalTransmissions = context.totalTransmissions;
 
+  // Define a smoothing factor to adjust probabilities
+  const smoothing = 0.5; // Adjust this value as needed
+
   for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
     const docsInCategory = context.divinerDocCount[oracleId];
     if (docsInCategory === 0) continue;
 
-    const logPrior = Math.log(docsInCategory / totalTransmissions);
+    // Adjusted logPrior with smoothing to reduce bias from small counts
+    const logPrior = Math.log((docsInCategory + smoothing) / (totalTransmissions + smoothing * context.divinerGroups.length));
     let logLikelihood = 0;
     idFreq.forEach((tf, omenId) => {
       const df = context.omenDocFreq[omenId] || 0;
-      const idf = Math.log((totalTransmissions + 1) / (df + 1)); // Smoothing
+      // Smoothing applied in IDF calculation as well
+      const idf = Math.log((totalTransmissions + 1) / (df + 1));
       const tfidf = tf * idf;
       const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
       const totalOmens = context.omenCount[oracleId];
-      const pOmen = (freq + 1) / (totalOmens + context.omens.length);
+      // Adjusted pOmen calculation with smoothing to avoid zero probabilities
+      const pOmen = (freq + smoothing) / (totalOmens + smoothing * context.omens.length);
       logLikelihood += tfidf * Math.log(pOmen);
     });
     const score = logPrior + logLikelihood;
@@ -138,7 +144,7 @@ export function predictWeightedText(inputObj, context) {
   const totalTransmissions = context.totalTransmissions;
 
   for (const [rawText, weight] of Object.entries(inputObj)) {
-    const omensList = chant(rawText, context.stemmer, context.excludes, context.n);
+    const omensList = chant(rawText, context);
     for (const omen of omensList) {
       const omenId = context.omenMapping.get(omen);
       if (omenId === undefined) continue;

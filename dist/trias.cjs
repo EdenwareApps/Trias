@@ -58711,33 +58711,6 @@ function expand(data) {
 }
 
 /**
- * Loads the model from a file, decompresses it, and restores its structure.
- * @param {string} file - File path.
- * @returns {Promise<Object>}
- */
-async function loadModel(file) {
-  // Read and decompress the file content
-  const condensedData = await fs.promises.readFile(file);
-  const jsonStr = await expand(condensedData);
-  if (!jsonStr) throw new Error('Decompressed data is empty');
-
-  // Parse the JSON data
-  const data = JSON.parse(jsonStr.toString('utf-8'));
-
-  // Restore Maps from serialized arrays/objects
-  data.categoryStemToId = new Map(data.categoryStemToId);
-  data.categoryVariations = new Map(Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [stem, new Map(Object.entries(variations))]));
-  data.categoryRelations = new Map(Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [cat, new Map(Object.entries(relObj))]));
-
-  // Restore omenFrequencies as an array of Maps
-  if (data.omenFrequencies) {
-    data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
-  }
-  // 'omens' is expected to remain an array
-  return data;
-}
-
-/**
  * Imports a model from a remote URL and saves it to the specified file.
  * @param {string} url - Remote URL.
  * @param {string} file - Destination file path.
@@ -58768,17 +58741,7 @@ async function importModel(url, file) {
  * @param {string} outputFile - Destination file path.
  * @param {Object} data - Model data.
  */
-async function saveModel(outputFile, data) {
-  // Normalize the data by converting Maps into serializable arrays/objects.
-  const normalizedData = {
-    ...data,
-    categoryStemToId: Array.from(data.categoryStemToId.entries()),
-    categoryVariations: Object.fromEntries([...data.categoryVariations.entries()].map(([stem, variations]) => [stem, Object.fromEntries(variations)])),
-    // Normalize omenFrequencies: convert each Map in the array to an object.
-    omenFrequencies: data.omenFrequencies ? data.omenFrequencies.map(map => Object.fromEntries(map)) : undefined
-    // 'omens' remains as an array.
-  };
-  const jsonStr = JSON.stringify(normalizedData);
+async function saveModel(outputFile, jsonStr) {
   const condensedData = await condense(jsonStr);
   await fs.promises.mkdir(path.dirname(outputFile), {
     recursive: true
@@ -58799,7 +58762,11 @@ async function saveModel(outputFile, data) {
  * @param {number} n - Maximum n-gram length.
  * @returns {string[]} - Array of n-grams.
  */
-function chant(text, stemmer, excludes, n) {
+function chant(text, {
+  stemmer,
+  excludes,
+  n
+}) {
   if (typeof text !== 'string') {
     console.error('chant: text is not a string', text);
     return [];
@@ -58828,7 +58795,7 @@ function trainText(data, context) {
     // output may be an array of categories
     const categories = (Array.isArray(output) ? output : [output]).filter(category => !context.excludes.has(context.stemmer.stem(category)));
     if (categories.length === 0) return;
-    const omensList = chant(input, context.stemmer, context.excludes, context.n);
+    const omensList = chant(input, context);
     if (omensList.length === 0) return;
     const uniqueOmens = new Set(omensList);
 
@@ -58863,9 +58830,7 @@ function trainText(data, context) {
         variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
       }
       const oracleId = context.categoryStemToId.get(categoryStem);
-      context.divinerDocCount[oracleId]++;
-
-      // Update the diviner category counts
+      // Fix: Removed duplicate increment of divinerDocCount to avoid counting the same document twice.
       context.divinerDocCount[oracleId]++;
       for (const omen of omensList) {
         const omenId = context.omenMapping.get(omen);
@@ -58954,7 +58919,7 @@ function predictText(text, context) {
   }
 
   // Tokenize text and compute term frequencies
-  const omensList = chant(text, context.stemmer, context.excludes, context.n);
+  const omensList = chant(text, context);
   const idFreq = new Map();
   for (const omen of omensList) {
     const omenId = context.omenMapping.get(omen);
@@ -58965,18 +58930,26 @@ function predictText(text, context) {
   const scores = new Map();
   let maxScore = -Infinity;
   const totalTransmissions = context.totalTransmissions;
+
+  // Define a smoothing factor to adjust probabilities
+  const smoothing = 0.5; // Adjust this value as needed
+
   for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
     const docsInCategory = context.divinerDocCount[oracleId];
     if (docsInCategory === 0) continue;
-    const logPrior = Math.log(docsInCategory / totalTransmissions);
+
+    // Adjusted logPrior with smoothing to reduce bias from small counts
+    const logPrior = Math.log((docsInCategory + smoothing) / (totalTransmissions + smoothing * context.divinerGroups.length));
     let logLikelihood = 0;
     idFreq.forEach((tf, omenId) => {
       const df = context.omenDocFreq[omenId] || 0;
-      const idf = Math.log((totalTransmissions + 1) / (df + 1)); // Smoothing
+      // Smoothing applied in IDF calculation as well
+      const idf = Math.log((totalTransmissions + 1) / (df + 1));
       const tfidf = tf * idf;
       const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
       const totalOmens = context.omenCount[oracleId];
-      const pOmen = (freq + 1) / (totalOmens + context.omens.length);
+      // Adjusted pOmen calculation with smoothing to avoid zero probabilities
+      const pOmen = (freq + smoothing) / (totalOmens + smoothing * context.omens.length);
       logLikelihood += tfidf * Math.log(pOmen);
     });
     const score = logPrior + logLikelihood;
@@ -59013,7 +58986,7 @@ function predictWeightedText(inputObj, context) {
   const weightExponent = context.weightExponent;
   const totalTransmissions = context.totalTransmissions;
   for (const [rawText, weight] of Object.entries(inputObj)) {
-    const omensList = chant(rawText, context.stemmer, context.excludes, context.n);
+    const omensList = chant(rawText, context);
     for (const omen of omensList) {
       const omenId = context.omenMapping.get(omen);
       if (omenId === undefined) continue;
@@ -59114,12 +59087,36 @@ class Trias {
     this.trained = Promise.resolve();
     this.initialized = this.init();
   }
+  fromJSON(data) {
+    data = JSON.parse(data.toString('utf-8'));
+
+    // Restore Maps from serialized arrays/objects
+    data.categoryStemToId = new Map(data.categoryStemToId);
+    data.categoryVariations = new Map(Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [stem, new Map(Object.entries(variations))]));
+    data.categoryRelations = new Map(Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [cat, new Map(Object.entries(relObj))]));
+    data.omenMapping = new Map(data.omenMapping);
+    data.excludes = new Set(data.excludes);
+
+    // Restore omenFrequencies as an array of Maps
+    data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
+    return data;
+  }
   toJSON() {
     const result = {};
     for (const p of this.contextProperties) {
-      result[p] = this[p];
+      if (p === "excludes") {
+        result[p] = Array.from(this[p]);
+      } else if (p === 'categoryRelations' || p === "categoryVariations") {
+        result[p] = Object.fromEntries([...this[p].entries()].map(([stem, entries]) => [stem, Object.fromEntries(entries)]));
+      } else if (p === 'categoryStemToId' || p === 'omenMapping') {
+        result[p] = Array.from(this[p].entries());
+      } else if (p === 'omenFrequencies') {
+        result[p] = this[p].map(map => Object.fromEntries(map));
+      } else {
+        result[p] = this[p];
+      }
     }
-    return result;
+    return JSON.stringify(result, null, 2);
   }
   async init() {
     try {
@@ -59159,38 +59156,24 @@ class Trias {
    * Loads the model from the given file and restores its internal structure.
    */
   async load(modelFile) {
-    const model = await loadModel(modelFile);
+    // Read and decompress the file content
+    const condensedData = await fs.promises.readFile(modelFile);
+    const jsonStr = await expand(condensedData);
+    if (!jsonStr) throw new Error('Decompressed data is empty');
+    const model = this.fromJSON(jsonStr);
+
+    // some of these below should be Map or Set by default instead of []
     this.divinerGroups = model.divinerGroups || [];
-    this.categoryStemToId = new Map(this.divinerGroups.map((stem, id) => [stem, id]));
-
-    // Restore categoryVariations, converting inner values to numbers
+    this.categoryStemToId = model.categoryStemToId || new Map();
     this.categoryVariations = model.categoryVariations || new Map();
-
-    // Restore categoryRelations, converting inner values to numbers
     this.categoryRelations = model.categoryRelations || new Map();
+    this.excludes = model.excludes || new Set();
     this.omens = model.omens || [];
-    this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
-    this.divinerDocCount = model.divinerDocCount ? model.divinerDocCount.map(Number) : [];
-    this.omenCount = model.omenCount ? model.omenCount.map(Number) : [];
-    this.omenDocFreq = model.omenDocFreq ? model.omenDocFreq.map(Number) : [];
-
-    // Restore omenFrequencies as an array of Maps, converting keys to numbers
-    this.omenFrequencies = [];
-    if (model.omenFrequencies && Array.isArray(model.omenFrequencies)) {
-      for (let entry of model.omenFrequencies) {
-        let newMap = new Map();
-        if (entry instanceof Map) {
-          for (const [k, v] of entry) {
-            newMap.set(Number(k), v);
-          }
-        } else {
-          for (const [k, v] of Object.entries(entry)) {
-            newMap.set(Number(k), v);
-          }
-        }
-        this.omenFrequencies.push(newMap);
-      }
-    }
+    this.omenMapping = model.omenMapping || new Map();
+    this.omenFrequencies = model.omenFrequencies || [];
+    this.divinerDocCount = model.divinerDocCount || [];
+    this.omenCount = model.omenCount || [];
+    this.omenDocFreq = model.omenDocFreq || [];
     this.totalTransmissions = Number(model.totalTransmissions) || 0;
     this.weightExponent = Number(model.weightExponent) || 2;
     if (this.omens.length > 0) {
@@ -59407,7 +59390,7 @@ class Trias {
       await this.initialized;
       await this.trained;
       await this.purge();
-      await saveModel(this.file, this);
+      await saveModel(this.file, this.toJSON());
       const {
         size
       } = await fs.promises.stat(this.file).catch(() => ({

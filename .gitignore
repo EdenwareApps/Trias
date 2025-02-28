@@ -130,3 +130,4 @@ out
 
 # custom
 media/
+test/test-cluster.js

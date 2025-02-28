@@ -32,43 +32,6 @@ export function expand(data) {
 }
 
 /**
- * Loads the model from a file, decompresses it, and restores its structure.
- * @param {string} file - File path.
- * @returns {Promise<Object>}
- */
-export async function loadModel(file) {
-    // Read and decompress the file content
-    const condensedData = await fs.promises.readFile(file);
-    const jsonStr = await expand(condensedData);
-    if (!jsonStr) throw new Error('Decompressed data is empty');
-    
-    // Parse the JSON data
-    const data = JSON.parse(jsonStr.toString('utf-8'));
-    
-    // Restore Maps from serialized arrays/objects
-    data.categoryStemToId = new Map(data.categoryStemToId);
-    data.categoryVariations = new Map(
-        Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [
-            stem,
-            new Map(Object.entries(variations))
-        ])
-    );
-    data.categoryRelations = new Map(
-        Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [
-            cat,
-            new Map(Object.entries(relObj))
-        ])
-    );
-
-    // Restore omenFrequencies as an array of Maps
-    if (data.omenFrequencies) {
-        data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
-    }
-    // 'omens' is expected to remain an array
-    return data;
-}
-
-/**
  * Imports a model from a remote URL and saves it to the specified file.
  * @param {string} url - Remote URL.
  * @param {string} file - Destination file path.
@@ -95,25 +58,7 @@ export async function importModel(url, file) {
  * @param {string} outputFile - Destination file path.
  * @param {Object} data - Model data.
  */
-export async function saveModel(outputFile, data) {
-    // Normalize the data by converting Maps into serializable arrays/objects.
-    const normalizedData = {
-        ...data,
-        categoryStemToId: Array.from(data.categoryStemToId.entries()),
-        categoryVariations: Object.fromEntries(
-            [...data.categoryVariations.entries()].map(([stem, variations]) => [
-                stem,
-                Object.fromEntries(variations)
-            ])
-        ),
-        // Normalize omenFrequencies: convert each Map in the array to an object.
-        omenFrequencies: data.omenFrequencies
-            ? data.omenFrequencies.map(map => Object.fromEntries(map))
-            : undefined
-        // 'omens' remains as an array.
-    };
-
-    const jsonStr = JSON.stringify(normalizedData);
+export async function saveModel(outputFile, jsonStr) {
     const condensedData = await condense(jsonStr);
     await fs.promises.mkdir(path.dirname(outputFile), { recursive: true }).catch(() => { });
     await fs.promises.writeFile(outputFile, condensedData);

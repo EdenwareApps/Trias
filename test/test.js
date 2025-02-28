@@ -61,7 +61,8 @@ async function testSaveAndLoad() {
   await oracle.initialized;
 
   await oracle.train([
-    {input: 'Tech innovations and latest gadgets', output: 'Technology'}
+    {input: 'Tech innovations and latest gadgets', output: 'Technology'},
+    {input: 'Cool Amish furniture and crafts', output: ['Amish', 'Furniture']}
   ]);
   
   // Salva o modelo
@@ -77,6 +78,13 @@ async function testSaveAndLoad() {
   });
   await oracleReloaded.initialized;
 
+  // check if the model is loaded correctly, specially the properties that should be Maps or Sets, check if they are not empty
+  assert.ok(oracleReloaded.categoryStemToId.size > 0, "categoryStemToId deve ter pelo menos um elemento");
+  assert.ok(oracleReloaded.categoryVariations.size > 0, "categoryVariations deve ter pelo menos um elemento");
+  assert.ok(oracleReloaded.categoryRelations.size > 0, "categoryRelations deve ter pelo menos um elemento");
+  assert.ok(oracleReloaded.excludes instanceof Set, "excludes deve ser uma instância de Set");
+
+  const prediction2 = await oracleReloaded.predict('Innovative gadgets', {as: 'objects', amount: 4});
   const prediction = await oracleReloaded.predict('Innovative gadgets');
   assert.strictEqual(prediction.toLowerCase(), 'technology', "Após carregar, a predição deve ser 'Technology'");
 

@@ -82,12 +82,53 @@ export class Trias {
         this.initialized = this.init();
     }
 
+    fromJSON(data) {
+        data = JSON.parse(data.toString('utf-8'));
+        
+        // Restore Maps from serialized arrays/objects
+        data.categoryStemToId = new Map(data.categoryStemToId);
+        data.categoryVariations = new Map(
+            Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [
+                stem,
+                new Map(Object.entries(variations))
+            ])
+        );
+        data.categoryRelations = new Map(
+            Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [
+                cat,
+                new Map(Object.entries(relObj))
+            ])
+        );
+        data.omenMapping = new Map(data.omenMapping);
+        data.excludes = new Set(data.excludes);    
+
+        // Restore omenFrequencies as an array of Maps
+        data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
+        
+        return data;
+    }
+
     toJSON() {
         const result = {};
         for (const p of this.contextProperties) {
+          if (p === "excludes") {
+            result[p] = Array.from(this[p]);
+          } else if (p === 'categoryRelations'  || p === "categoryVariations") { 
+            result[p] = Object.fromEntries(
+              [...this[p].entries()].map(([stem, entries]) => [ 
+                stem,
+                Object.fromEntries(entries)
+              ])
+            );
+          } else if (p === 'categoryStemToId' || p === 'omenMapping') {
+            result[p] = Array.from(this[p].entries());
+          } else if (p === 'omenFrequencies') {
+            result[p] = this[p].map(map => Object.fromEntries(map));
+          } else {
             result[p] = this[p];
+          }
         }
-        return result;
+        return JSON.stringify(result, null, 2);
     }
 
     async init() {
@@ -126,40 +167,26 @@ export class Trias {
      * Loads the model from the given file and restores its internal structure.
      */
     async load(modelFile) {
-        const model = await Persistence.loadModel(modelFile);
+        // Read and decompress the file content
+        const condensedData = await fs.promises.readFile(modelFile);
+        const jsonStr = await Persistence.expand(condensedData);
+        if (!jsonStr) throw new Error('Decompressed data is empty');
+        
+        const model = this.fromJSON(jsonStr);
 
+        // some of these below should be Map or Set by default instead of []
         this.divinerGroups = model.divinerGroups || [];
-        this.categoryStemToId = new Map(this.divinerGroups.map((stem, id) => [stem, id]));
-
-        // Restore categoryVariations, converting inner values to numbers
+        this.categoryStemToId = model.categoryStemToId || new Map();
         this.categoryVariations = model.categoryVariations || new Map();
-        
-        // Restore categoryRelations, converting inner values to numbers
         this.categoryRelations = model.categoryRelations || new Map();
-        
+        this.excludes = model.excludes || new Set();
         this.omens = model.omens || [];
-        this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
-        this.divinerDocCount = model.divinerDocCount ? model.divinerDocCount.map(Number) : [];
-        this.omenCount = model.omenCount ? model.omenCount.map(Number) : [];
-        this.omenDocFreq = model.omenDocFreq ? model.omenDocFreq.map(Number) : [];
-
-        // Restore omenFrequencies as an array of Maps, converting keys to numbers
-        this.omenFrequencies = [];
-        if (model.omenFrequencies && Array.isArray(model.omenFrequencies)) {
-            for (let entry of model.omenFrequencies) {
-                let newMap = new Map();
-                if (entry instanceof Map) {
-                    for (const [k, v] of entry) {
-                        newMap.set(Number(k), v);
-                    }
-                } else {
-                    for (const [k, v] of Object.entries(entry)) {
-                        newMap.set(Number(k), v);
-                    }
-                }
-                this.omenFrequencies.push(newMap);
-            }
-        }
+        this.omenMapping = model.omenMapping || new Map();
+        this.omenFrequencies = model.omenFrequencies || [];
+        
+        this.divinerDocCount = model.divinerDocCount || [];
+        this.omenCount = model.omenCount || [];
+        this.omenDocFreq = model.omenDocFreq || [];
 
         this.totalTransmissions = Number(model.totalTransmissions) || 0;
         this.weightExponent = Number(model.weightExponent) || 2;
@@ -374,7 +401,7 @@ export class Trias {
             await this.initialized;
             await this.trained;
             await this.purge();
-            await Persistence.saveModel(this.file, this);
+            await Persistence.saveModel(this.file, this.toJSON());
             const { size } = await fs.promises.stat(this.file).catch(() => ({ size: 0 }));
             this.avgOmenSize = size / this.omens.length;
         } catch (e) {
