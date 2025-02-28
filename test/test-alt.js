@@ -91,7 +91,7 @@ import path from 'path';
       const testWeighted = await oracle.predict({
         'News Broadcast reporting the latest news of the day': 0.1,
         'Live Football, incredible play and full coverage': 1
-      }, {as: 'objects', limit: 5});
+      }, {as: 'objects', amount: 5});
       console.log('\nPredict on test sample with weighted probabilities\n');
       console.table(testWeighted);
     })();

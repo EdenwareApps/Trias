@@ -169,7 +169,7 @@ async function testWeightedPrediction() {
   const weightedResults = await oracle.predict({
     'News report and current events': 0.3,
     'Exciting football match highlights': 0.7
-  }, {as: 'objects', limit: 2});
+  }, {as: 'objects', amount: 2});
   
   assert.ok(Array.isArray(weightedResults), "A predição ponderada deve retornar um array");
   assert.ok(weightedResults.length > 0, "Deve haver pelo menos um resultado na predição ponderada");
@@ -200,7 +200,7 @@ async function testCategoryRelations() {
     {input: 'Exciting football match highlights', output: ['Soccer', 'Sports']}
   ]);
   
-  const related = await oracle.getRelatedCategories('News', {as: 'array', limit: 2});
+  const related = await oracle.getRelatedCategories('News', {as: 'array', amount: 2});
   assert.ok(Array.isArray(related), "getRelatedCategories deve retornar um array");
   assert.ok(related.length > 0, "Deve haver pelo menos um resultado na predição ponderada");
   assert.ok(related[0] === 'Soccer', 'A primeira categoria relacionada deve ser "Soccer"');

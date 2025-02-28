@@ -5,21 +5,21 @@
 - **Train and update its model in real-time**, allowing you to add training examples on the fly.
 - **Persist the trained model** in a compact, portable, and compressed file.
 
-Inspired by the ancient Greek prophetic nymphs known as the Trias (Cleodora, Melaina and Daphnis), this tool reimagines divination for the digital age. Just as the Trias interpreted omens to foresee the future, Trias processes large streams of text to generate insightful predictions.
+Inspired by the ancient Greek prophetic nymphs known as the Trias (Cleodora, Melaina and Daphnis), this tool reimagines divination for the digital age. Just as the Trias interpreted omens to foresee the future, **Trias** processes large streams of text to generate insightful predictions.
 
 <p align="center">
     <img src="http://edenware.app/trias/images/trias-logo.jpg" height="440" width="600" style="border-radius: 24px;" id="trias" alt="Trias" title="Trias" />
 </p>
 
 
-**Note:** All Trias methods are asynchronous, so you can perform additional training and prediction simultaneously without blocking your application.
+**Note:** All **Trias** methods are asynchronous, so you can perform additional training and prediction simultaneously without blocking your application.
 
 <br />  
 
 ## Installation
   
 
-Install Trias via NPM:
+Install **Trias** via NPM:
   
 
 ```bash
@@ -51,7 +51,7 @@ const { Trias } = require('trias');
 
 #### Initializing
 
-Creating a new `Trias` instance.
+Creating a new **Trias** instance.
 
 ```javascript
 
@@ -103,12 +103,26 @@ console.log(prediction);
 For a more detailed prediction with scores:
 
 ```javascript
-const predictions = await trias.predict("What does the future hold?", { as: "objects", limit: 2 });
+const predictions = await trias.predict("What does the future hold?", { as: "objects", amount: 2 });
 console.log(predictions);
 // Example output:
 // [
 //   { category: "optimistic", score: 0.8 },
 //   { category: "pessimistic", score: 0.2 }
+// ]
+```
+
+The `amount` option specifies the exact number of predictions the user wants, whereas `limit` automatically selects the most related categories up to a maximum of `limit`. This means that if there aren't enough strongly related categories, the function may return fewer than `limit` predictions.
+
+When `limit` is provided, it disables the user-defined `amount`. 
+
+
+```javascript
+const predictions = await trias.predict("What does the future hold?", { as: "array", limit: 2 });
+console.log(predictions);
+// Example output:
+// [
+//   "optimistic"
 // ]
 ```
 For weighted predictions, pass an object where the keys are texts and the values are their weights:
@@ -180,13 +194,13 @@ Train the instance with a new example.
 
 #### `predict(text, options)`
 
-Asynchronously predicts the category of the input text using a TF-IDF approach.
+Asynchronously predicts the category of the input text.
 
 **Parameters:**
 - `text` (`string | object`): The input text for prediction.
 - `options` (`object`):
     - `as` (`string`): Desired output format (`'string'`, `'array'`, or `'objects'`).
-    - `limit` (`number`): Maximum number of categories to return.
+    - `amount` (`number`): Maximum number of categories to return.
 
 **Returns:** A prediction result in the specified format.
 
@@ -200,7 +214,7 @@ Get related groups of categories based on the input category scores.
 - `categoryScores` (`object`): An object where keys are category names and values are their scores.
 - `options` (`object`):
     - `as` (`string`): Desired output format (`'string'`, `'array'`, or `'objects'`).
-    - `limit` (`number`): Maximum number of categories to return.
+    - `amount` (`number`): Maximum number of categories to return.
 
 **Returns:** Related groups of categories in the specified format.
 <br />  

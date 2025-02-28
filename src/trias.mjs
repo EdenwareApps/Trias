@@ -78,6 +78,7 @@ export class Trias {
             'totalTransmissions'
         ]);
 
+        this.trained = Promise.resolve();
         this.initialized = this.init();
     }
 
@@ -179,11 +180,10 @@ export class Trias {
         return 0;
     }
 
-
-
     async train(text, category) {
         await this.initialized;
-
+        let release;
+        this.trained = new Promise(resolve => release = resolve);
         if (category && !Array.isArray(text)) {
             text = [
                 {input: text, output: category}
@@ -224,13 +224,16 @@ export class Trias {
             }
         }
         
-        if (this.size > (this.maxModelSize * 1.5)) {
-            await this.purge();
+        if (!this.isPurging && !this.isSaving && this.size > (this.maxModelSize * 1.5)) { // tame the model size
+            await this.purge().catch(() => {});
         }
+
+        release();
     }
 
-    async predict(text, options = { as: 'string', limit: 1 }) {
+    async predict(text, options = { as: 'string', amount: 1 }) {
         await this.initialized;
+        await this.trained;
         const results = Prediction.predictText(text, this);
         return Prediction.norm(results, options, this.bestVariant.bind(this), this.capitalize);
     }
@@ -261,10 +264,10 @@ export class Trias {
      * if the candidates are insufficient, it makes fallback to predictWeightedText.
      * 
      * @param {Object} inputScores - Object with categories and their scores.
-     * @param {number} limit - Limit of categories to return.
+     * @param {number} amount - Limit of categories to return.
      * @returns {string[]} - List of related categories.
      */
-    getRelatedCategories(inputScores, options = { as: 'objects', limit: 5 }) {
+    getRelatedCategories(inputScores, options = { as: 'objects', amount: 5 }) {
         const relatedScores = {};
         let found = false;
 
@@ -293,7 +296,7 @@ export class Trias {
         }
         
         // Fallback: if there are not enough candidates, uses predictWeightedText
-        if (candidates.length < options.limit) {
+        if (candidates.length < options.amount) {
             // Uses inputScores as pseudo input for predictWeightedText
             const fallbackResults = Prediction.predictWeightedText(inputScores, this);
             // Joins explicit candidates with the fallback (without duplicates)
@@ -321,45 +324,65 @@ export class Trias {
         const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
         if (this.omens.length <= allowedOmens) return;
 
-        // Create an array of omen indices paired with their frequency (from omenCount).
-        const omenFrequencyArray = this.omenCount.map((count, idx) => ({ idx, count }));
+        this.isPurging = true; // set it after not returning
+        
+        let err = null;
+        try {
+            // Create an array of omen indices paired with their frequency (from omenCount).
+            const omenFrequencyArray = this.omenCount.map((count, idx) => ({ idx, count }));
 
-        // Sort the array in descending order based on frequency.
-        omenFrequencyArray.sort((a, b) => b.count - a.count);
+            // Sort the array in descending order based on frequency.
+            omenFrequencyArray.sort((a, b) => b.count - a.count);
 
-        // Select indices of the top allowed omens.
-        const allowedIndices = new Set(omenFrequencyArray.slice(0, allowedOmens).map(item => item.idx));
+            // Select indices of the top allowed omens.
+            const allowedIndices = new Set(omenFrequencyArray.slice(0, allowedOmens).map(item => item.idx));
 
-        // Build new arrays for omens, omenFrequencies, and omenCount based on allowed indices.
-        const newOmens = [];
-        const newOmenFrequencies = [];
-        const newOmenCount = [];
+            // Build new arrays for omens, omenFrequencies, and omenCount based on allowed indices.
+            const newOmens = [];
+            const newOmenFrequencies = [];
+            const newOmenCount = [];
 
-        for (let i = 0; i < this.omens.length; i++) {
-            if (allowedIndices.has(i)) {
-                newOmens.push(this.omens[i]);
-                newOmenFrequencies.push(this.omenFrequencies[i]);
-                newOmenCount.push(this.omenCount[i]);
+            for (let i = 0; i < this.omens.length; i++) {
+                if (allowedIndices.has(i)) {
+                    newOmens.push(this.omens[i]);
+                    newOmenFrequencies.push(this.omenFrequencies[i]);
+                    newOmenCount.push(this.omenCount[i]);
+                }
             }
+
+            // Update the model's omen-related properties.
+            this.omens = newOmens;
+            this.omenFrequencies = newOmenFrequencies;
+            this.omenCount = newOmenCount;
+
+            // Rebuild the omenMapping based on the new omens array.
+            this.omenMapping = new Map(this.omens.map((omen, idx) => [omen, idx]));
+
+            await this.save();
+        } catch (e) {
+            err = e;
+        } finally {
+            this.isPurging = false;
         }
-
-        // Update the model's omen-related properties.
-        this.omens = newOmens;
-        this.omenFrequencies = newOmenFrequencies;
-        this.omenCount = newOmenCount;
-
-        // Rebuild the omenMapping based on the new omens array.
-        this.omenMapping = new Map(this.omens.map((omen, idx) => [omen, idx]));
-
-        await this.save();
+        if (err) throw err;
     }
 
     async save() {
-        await this.initialized;
-        await this.purge();
-        await Persistence.saveModel(this.file, this);
-        const { size } = await fs.promises.stat(this.file).catch(() => ({ size: 0 }));
-        this.avgOmenSize = size / this.omens.length;
+        this.isSaving = true;
+        let err = null;
+        try {
+            await this.initialized;
+            await this.trained;
+            await this.purge();
+            await Persistence.saveModel(this.file, this);
+            const { size } = await fs.promises.stat(this.file).catch(() => ({ size: 0 }));
+            this.avgOmenSize = size / this.omens.length;
+        } catch (e) {
+            err = e;
+        } finally {
+            this.isSaving = false;
+        }
+        if (err) throw err;
     }
 
     reset() {
