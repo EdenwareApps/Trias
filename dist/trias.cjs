@@ -58727,6 +58727,7 @@ async function loadModel(file) {
   // Restore Maps from serialized arrays/objects
   data.categoryStemToId = new Map(data.categoryStemToId);
   data.categoryVariations = new Map(Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [stem, new Map(Object.entries(variations))]));
+  data.categoryRelations = new Map(Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [cat, new Map(Object.entries(relObj))]));
 
   // Restore omenFrequencies as an array of Maps
   if (data.omenFrequencies) {
@@ -58816,70 +58817,65 @@ function chant(text, stemmer, excludes, n) {
 /**
  * Trains the model with a given text and category.
  * Updates the context (model state) accordingly.
- * @param {string|Object} text - The prophetic text, or an object with { input, output }.
- * @param {string} category - The diviner category for the prophecy.
+ * @param {Array} data - The prophetic text, an array of objects with { input, output }.
  * @param {Object} context - The training context (model state).
  */
-function trainText(text, category, context) {
-  if (Array.isArray(text)) {
-    for (const t of text) {
-      if (category) {
-        trainText(t, category, context);
-      } else {
-        trainText(t.input, t.output, context);
+function trainText(data, context) {
+  for (const {
+    input,
+    output
+  } of data) {
+    // output may be an array of categories
+    const categories = (Array.isArray(output) ? output : [output]).filter(category => !context.excludes.has(context.stemmer.stem(category)));
+    if (categories.length === 0) return;
+    const omensList = chant(input, context.stemmer, context.excludes, context.n);
+    if (omensList.length === 0) return;
+    const uniqueOmens = new Set(omensList);
+
+    // Register new omens
+    for (const omen of uniqueOmens) {
+      if (!context.omenMapping.has(omen)) {
+        const omenId = context.omens.length;
+        context.omenMapping.set(omen, omenId);
+        context.omens.push(omen);
+        context.omenDocFreq[omenId] = 0;
       }
     }
-    return;
-  }
-  if (typeof text === 'object' && typeof text.input === 'string') {
-    category = text.output;
-    text = text.input;
-  }
-  const categoryStem = context.stemmer.stem(category);
-  if (context.excludes.has(categoryStem)) return;
-  if (!context.categoryStemToId.has(categoryStem)) {
-    const oracleId = context.divinerGroups.length;
-    context.categoryStemToId.set(categoryStem, oracleId);
-    context.divinerGroups.push(categoryStem);
-    context.categoryVariations.set(categoryStem, new Map());
-    context.categoryVariations.get(categoryStem).set(category, 1);
-    context.divinerDocCount[oracleId] = 0;
-    context.omenCount[oracleId] = 0;
-    context.omenFrequencies[oracleId] = new Map();
-  } else {
-    const variationCounts = context.categoryVariations.get(categoryStem);
-    variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
-  }
-  const oracleId = context.categoryStemToId.get(categoryStem);
-  const omensList = chant(text, context.stemmer, context.excludes, context.n);
-  if (omensList.length === 0) return;
-  const uniqueOmens = new Set(omensList);
 
-  // Register new omens
-  for (const omen of uniqueOmens) {
-    if (!context.omenMapping.has(omen)) {
-      const omenId = context.omens.length;
-      context.omenMapping.set(omen, omenId);
-      context.omens.push(omen);
-      context.omenDocFreq[omenId] = 0;
+    // Update global omen frequency
+    for (const omen of uniqueOmens) {
+      const omenId = context.omenMapping.get(omen);
+      context.omenDocFreq[omenId]++;
+    }
+    for (const category of categories) {
+      const categoryStem = context.stemmer.stem(category);
+      if (!context.categoryStemToId.has(categoryStem)) {
+        const oracleId = context.divinerGroups.length;
+        context.categoryStemToId.set(categoryStem, oracleId);
+        context.divinerGroups.push(categoryStem);
+        context.categoryVariations.set(categoryStem, new Map());
+        context.categoryVariations.get(categoryStem).set(category, 1);
+        context.divinerDocCount[oracleId] = 0;
+        context.omenCount[oracleId] = 0;
+        context.omenFrequencies[oracleId] = new Map();
+      } else {
+        const variationCounts = context.categoryVariations.get(categoryStem);
+        variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
+      }
+      const oracleId = context.categoryStemToId.get(categoryStem);
+      context.divinerDocCount[oracleId]++;
+
+      // Update the diviner category counts
+      context.divinerDocCount[oracleId]++;
+      for (const omen of omensList) {
+        const omenId = context.omenMapping.get(omen);
+        const current = context.omenFrequencies[oracleId].get(omenId) || 0;
+        context.omenFrequencies[oracleId].set(omenId, current + 1);
+        context.omenCount[oracleId]++;
+      }
+      context.totalTransmissions++;
     }
   }
-
-  // Update global omen frequency
-  for (const omen of uniqueOmens) {
-    const omenId = context.omenMapping.get(omen);
-    context.omenDocFreq[omenId]++;
-  }
-
-  // Update the diviner category counts
-  context.divinerDocCount[oracleId]++;
-  for (const omen of omensList) {
-    const omenId = context.omenMapping.get(omen);
-    const current = context.omenFrequencies[oracleId].get(omenId) || 0;
-    context.omenFrequencies[oracleId].set(omenId, current + 1);
-    context.omenCount[oracleId]++;
-  }
-  context.totalTransmissions++;
 }
 
 /**
@@ -58892,6 +58888,9 @@ function trainText(text, category, context) {
  */
 function norm(results, options, bestVariantFn, capitalize) {
   if (results.length) {
+    if (typeof options.capitalize === 'boolean') {
+      capitalize = options.capitalize;
+    }
     results.forEach(result => {
       result.category = bestVariantFn(result.category);
     });
@@ -59071,6 +59070,7 @@ class Trias {
     // Model state variables
     this.categoryStemToId = new Map();
     this.categoryVariations = new Map();
+    this.categoryRelations = new Map();
     this.divinerGroups = [];
     this.divinerDocCount = [];
     this.omenCount = [];
@@ -59081,7 +59081,7 @@ class Trias {
     this.totalTransmissions = 0;
     this.capitalize = capitalize;
     this.excludes = new Set(excludes);
-    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'stemmer', 'maxModelSize', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalTransmissions']);
+    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'stemmer', 'maxModelSize', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'categoryRelations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalTransmissions']);
     this.initialized = this.init();
   }
   toJSON() {
@@ -59134,24 +59134,10 @@ class Trias {
     this.categoryStemToId = new Map(this.divinerGroups.map((stem, id) => [stem, id]));
 
     // Restore categoryVariations, converting inner values to numbers
-    this.categoryVariations = new Map();
-    if (model.categoryVariations instanceof Map) {
-      for (const [stem, variations] of model.categoryVariations) {
-        const converted = new Map();
-        for (const [k, v] of variations) {
-          converted.set(k, Number(v));
-        }
-        this.categoryVariations.set(stem, converted);
-      }
-    } else if (model.categoryVariations) {
-      for (const [stem, variations] of Object.entries(model.categoryVariations)) {
-        const converted = new Map();
-        for (const [k, v] of Object.entries(variations)) {
-          converted.set(k, Number(v));
-        }
-        this.categoryVariations.set(stem, converted);
-      }
-    }
+    this.categoryVariations = model.categoryVariations || new Map();
+
+    // Restore categoryRelations, converting inner values to numbers
+    this.categoryRelations = model.categoryRelations || new Map();
     this.omens = model.omens || [];
     this.omenMapping = new Map(this.omens.map((omen, id) => [omen, id]));
     this.divinerDocCount = model.divinerDocCount ? model.divinerDocCount.map(Number) : [];
@@ -59196,14 +59182,46 @@ class Trias {
   }
   async train(text, category) {
     await this.initialized;
-    // check category agains this.excludes
-    if (category && this.excludes.has(category.trim().toLowerCase())) {
-      return;
-    } else if (Array.isArray(text)) {
-      text = text.filter(item => !this.excludes.has(item.output.trim().toLowerCase()));
-      if (text.length === 0) return;
+    if (category && !Array.isArray(text)) {
+      text = [{
+        input: text,
+        output: category
+      }];
     }
-    trainText(text, category, this);
+
+    // check category against this.excludes
+    text = text.filter(item => {
+      if (typeof item.output === 'string') {
+        return !this.excludes.has(item.output.trim().toLowerCase());
+      } else if (Array.isArray(item.output)) {
+        item.output = item.output.filter(output => !this.excludes.has(output.trim().toLowerCase()));
+        if (item.output.length === 0) return false;
+      }
+      return true;
+    });
+    if (text.length === 0) return;
+
+    // Calls the main training
+    trainText(text, this);
+
+    // If there are more than one category, updates the co-occurrence relations
+    for (const item of text) {
+      if (!Array.isArray(item.output) || item.output.length < 2) {
+        continue;
+      }
+      for (let i = 0; i < item.output.length; i++) {
+        for (let j = 0; j < item.output.length; j++) {
+          if (i === j) continue;
+          const catA = this.stemmer.stem(item.output[i]);
+          const catB = this.stemmer.stem(item.output[j]);
+          if (!this.categoryRelations.has(catA)) {
+            this.categoryRelations.set(catA, new Map());
+          }
+          const relMap = this.categoryRelations.get(catA);
+          relMap.set(catB, (relMap.get(catB) || 0) + 1);
+        }
+      }
+    }
     if (this.size > this.maxModelSize * 1.5) {
       await this.purge();
     }
@@ -59216,9 +59234,11 @@ class Trias {
     const results = predictText(text, this);
     return norm(results, options, this.bestVariant.bind(this), this.capitalize);
   }
-  bestVariant(stemmedCategory) {
-    const variationCounts = this.categoryVariations.get(stemmedCategory);
-    if (!variationCounts) return stemmedCategory;
+  bestVariant(categoryStem) {
+    const variationCounts = this.categoryVariations.get(categoryStem);
+    if (!variationCounts) {
+      return categoryStem;
+    }
     let best = null;
     let bestCount = -Infinity;
     for (const [variation, count] of variationCounts.entries()) {
@@ -59228,6 +59248,64 @@ class Trias {
       }
     }
     return best;
+  }
+
+  /**
+   * getRelatedCategories
+   * 
+   * Given an input of the type { tag1: score1, tag2: score2 },
+   * returns a list of related categories that do not contain in the input.
+   * 
+   * The function uses explicit relations (stored in categoryRelations) and,
+   * if the candidates are insufficient, it makes fallback to predictWeightedText.
+   * 
+   * @param {Object} inputScores - Object with categories and their scores.
+   * @param {number} limit - Limit of categories to return.
+   * @returns {string[]} - List of related categories.
+   */
+  getRelatedCategories(inputScores, options = {
+    as: 'objects',
+    limit: 5
+  }) {
+    const relatedScores = {};
+    let found = false;
+    if (typeof inputScores === 'string') {
+      inputScores = {
+        [inputScores]: 1
+      };
+    }
+
+    // Uses explicit relations if they exist
+    for (const [cat, score] of Object.entries(inputScores)) {
+      const categoryStem = this.stemmer.stem(cat);
+      const relations = this.categoryRelations.get(categoryStem);
+      if (relations) {
+        for (const [relatedCat, count] of relations.entries()) {
+          if (inputScores.hasOwnProperty(relatedCat)) continue;
+          relatedScores[relatedCat] = (relatedScores[relatedCat] || 0) + count * score;
+          found = true;
+        }
+      }
+    }
+    let candidates = [];
+    if (found && Object.keys(relatedScores).length > 0) {
+      candidates = Object.entries(relatedScores).sort(([, aScore], [, bScore]) => bScore - aScore).map(([category, score]) => ({
+        category,
+        score
+      }));
+    }
+
+    // Fallback: if there are not enough candidates, uses predictWeightedText
+    if (candidates.length < options.limit) {
+      // Uses inputScores as pseudo input for predictWeightedText
+      const fallbackResults = predictWeightedText(inputScores, this);
+      // Joins explicit candidates with the fallback (without duplicates)
+      candidates = candidates.concat(fallbackResults.filter(candidate => {
+        const has = candidates.some(c => c.category === candidate.category);
+        return !has;
+      }));
+    }
+    return norm(candidates, options, this.bestVariant.bind(this), this.capitalize);
   }
 
   /**

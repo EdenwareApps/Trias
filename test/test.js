@@ -76,7 +76,7 @@ async function testSaveAndLoad() {
     size: 512 * 1024
   });
   await oracleReloaded.initialized;
-  
+
   const prediction = await oracleReloaded.predict('Innovative gadgets');
   assert.strictEqual(prediction.toLowerCase(), 'technology', "Após carregar, a predição deve ser 'Technology'");
 
@@ -182,6 +182,32 @@ async function testWeightedPrediction() {
   console.log("testWeightedPrediction passou.");
 }
 
+async function testCategoryRelations() {
+  console.log("Executando: testCategoryRelations");
+
+  await cleanup();
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024
+  });
+  await oracle.initialized;
+
+  await oracle.train([
+    {input: 'News report and current events', output: ['Soccer', 'News']},
+    {input: 'Exciting football match highlights', output: ['Soccer', 'Sports']}
+  ]);
+  
+  const related = await oracle.getRelatedCategories('News', {as: 'array', limit: 2});
+  assert.ok(Array.isArray(related), "getRelatedCategories deve retornar um array");
+  assert.ok(related.length > 0, "Deve haver pelo menos um resultado na predição ponderada");
+  assert.ok(related[0] === 'Soccer', 'A primeira categoria relacionada deve ser "Soccer"');
+
+  console.log("testCategoryRelations passou.");
+}
+
 async function runAllTests() {
   try {
     await testTrainingAndPrediction();
@@ -189,6 +215,7 @@ async function runAllTests() {
     await testBestVariant();
     await testResetAndDestroy();
     await testWeightedPrediction();
+    await testCategoryRelations();
     console.log("Todos os testes passaram com sucesso.");
   } catch (err) {
     console.error("Falha nos testes:", err);

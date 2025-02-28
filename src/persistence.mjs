@@ -53,7 +53,13 @@ export async function loadModel(file) {
             new Map(Object.entries(variations))
         ])
     );
-    
+    data.categoryRelations = new Map(
+        Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [
+            cat,
+            new Map(Object.entries(relObj))
+        ])
+    );
+
     // Restore omenFrequencies as an array of Maps
     if (data.omenFrequencies) {
         data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
@@ -106,6 +112,7 @@ export async function saveModel(outputFile, data) {
             : undefined
         // 'omens' remains as an array.
     };
+
     const jsonStr = JSON.stringify(normalizedData);
     const condensedData = await condense(jsonStr);
     await fs.promises.mkdir(path.dirname(outputFile), { recursive: true }).catch(() => { });

@@ -57,7 +57,7 @@ Creating a new `Trias` instance.
 
 const trias = new Trias({
 
-    file: './nevermind.trias', // Path to the model file
+    file: './my-model.trias', // Path to the model file
     create: true, // Initialize a new model if none exists
     n: 3, // Maximum n-gram length (1-3)
     language: 'en', // ISO 2-letter code for the language (e.g., 'en' for English)
@@ -72,25 +72,22 @@ const trias = new Trias({
 
 #### Training
 
-Train Trias with text inputs and their corresponding categories asynchronously:
+Train Trias asynchronously using text inputs paired with their corresponding category labels. In the example below, the `train()` method is used to update the model with new training data:
 
 ```javascript
-await trias.train("The future holds great promise.", "optimistic");
-await trias.train("Dark clouds loom on the horizon.", "pessimistic");
-
-// Train multiple texts with their associated categories.
-// In this example, both texts will be linked to both "optimistic" and "utopic" categories.
 await trias.train([
-    "The future holds great promise.",
-    "A rainbow looms on the horizon."
-], ["optimistic", "utopic"]);
-
-// Alternatively, use object notation:
-await trias.train([{
-    input: "Dark clouds loom on the horizon.",
-    output: "pessimistic"
-}]);
+    {
+        input: "Dark clouds loom on the horizon.",
+        output: ["pessimistic", "dark"]
+    },
+    {
+        input: "The future holds great promise.",
+        output: ["optimistic"]
+    }
+]);
 ```
+
+You can invoke `train()` multiple times on the same model to perform incremental training. The model will continuously learn from the new data while retaining the most significant information if the total exceeds the predefined size.
 
 <br />
   
@@ -193,6 +190,19 @@ Asynchronously predicts the category of the input text using a TF-IDF approach.
 
 **Returns:** A prediction result in the specified format.
 
+<br />  
+
+#### `getRelatedGroups(categoryScores, options)`
+
+Get related groups of categories based on the input category scores.
+
+**Parameters:**
+- `categoryScores` (`object`): An object where keys are category names and values are their scores.
+- `options` (`object`):
+    - `as` (`string`): Desired output format (`'string'`, `'array'`, or `'objects'`).
+    - `limit` (`number`): Maximum number of categories to return.
+
+**Returns:** Related groups of categories in the specified format.
 <br />  
 
 #### `save()`

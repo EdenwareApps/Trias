@@ -30,74 +30,65 @@ export function chant(text, stemmer, excludes, n) {
   /**
    * Trains the model with a given text and category.
    * Updates the context (model state) accordingly.
-   * @param {string|Object} text - The prophetic text, or an object with { input, output }.
-   * @param {string} category - The diviner category for the prophecy.
+   * @param {Array} data - The prophetic text, an array of objects with { input, output }.
    * @param {Object} context - The training context (model state).
    */
-  export function trainText(text, category, context) {
-    if (Array.isArray(text)) {
-      for (const t of text) {
-        if (category) {
-          trainText(t, category, context);
-        } else {
-          trainText(t.input, t.output, context);
+  export function trainText(data, context) {
+    for (const {input, output} of data) {
+      
+      // output may be an array of categories
+      const categories = (Array.isArray(output) ? output : [output]).filter(category => !context.excludes.has(context.stemmer.stem(category)));
+      if (categories.length === 0) return;
+      
+      const omensList = chant(input, context.stemmer, context.excludes, context.n);
+      if (omensList.length === 0) return;
+      
+      const uniqueOmens = new Set(omensList);
+      
+      // Register new omens
+      for (const omen of uniqueOmens) {
+        if (!context.omenMapping.has(omen)) {
+          const omenId = context.omens.length;
+          context.omenMapping.set(omen, omenId);
+          context.omens.push(omen);
+          context.omenDocFreq[omenId] = 0;
         }
       }
-      return;
-    }
-    
-    if (typeof text === 'object' && typeof text.input === 'string') {
-      category = text.output;
-      text = text.input;
-    }
-    
-    const categoryStem = context.stemmer.stem(category);
-    if (context.excludes.has(categoryStem)) return;
-    
-    if (!context.categoryStemToId.has(categoryStem)) {
-      const oracleId = context.divinerGroups.length;
-      context.categoryStemToId.set(categoryStem, oracleId);
-      context.divinerGroups.push(categoryStem);
-      context.categoryVariations.set(categoryStem, new Map());
-      context.categoryVariations.get(categoryStem).set(category, 1);
-      context.divinerDocCount[oracleId] = 0;
-      context.omenCount[oracleId] = 0;
-      context.omenFrequencies[oracleId] = new Map();
-    } else {
-      const variationCounts = context.categoryVariations.get(categoryStem);
-      variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
-    }
-    const oracleId = context.categoryStemToId.get(categoryStem);
-    
-    const omensList = chant(text, context.stemmer, context.excludes, context.n);
-    if (omensList.length === 0) return;
-    
-    const uniqueOmens = new Set(omensList);
-    
-    // Register new omens
-    for (const omen of uniqueOmens) {
-      if (!context.omenMapping.has(omen)) {
-        const omenId = context.omens.length;
-        context.omenMapping.set(omen, omenId);
-        context.omens.push(omen);
-        context.omenDocFreq[omenId] = 0;
+      
+      // Update global omen frequency
+      for (const omen of uniqueOmens) {
+        const omenId = context.omenMapping.get(omen);
+        context.omenDocFreq[omenId]++;
+      }      
+
+      for (const category of categories) {
+        const categoryStem = context.stemmer.stem(category);
+        if (!context.categoryStemToId.has(categoryStem)) {
+          const oracleId = context.divinerGroups.length;
+          context.categoryStemToId.set(categoryStem, oracleId);
+          context.divinerGroups.push(categoryStem);
+          context.categoryVariations.set(categoryStem, new Map());
+          context.categoryVariations.get(categoryStem).set(category, 1);
+          context.divinerDocCount[oracleId] = 0;
+          context.omenCount[oracleId] = 0;
+          context.omenFrequencies[oracleId] = new Map();
+        } else {
+          const variationCounts = context.categoryVariations.get(categoryStem);
+          variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
+        }
+        const oracleId = context.categoryStemToId.get(categoryStem);
+        context.divinerDocCount[oracleId]++;
+
+        // Update the diviner category counts
+        context.divinerDocCount[oracleId]++;
+        for (const omen of omensList) {
+          const omenId = context.omenMapping.get(omen);
+          const current = context.omenFrequencies[oracleId].get(omenId) || 0;
+          context.omenFrequencies[oracleId].set(omenId, current + 1);
+          context.omenCount[oracleId]++;
+        }
+        context.totalTransmissions++;
       }
     }
-    
-    // Update global omen frequency
-    for (const omen of uniqueOmens) {
-      const omenId = context.omenMapping.get(omen);
-      context.omenDocFreq[omenId]++;
-    }
-    
-    // Update the diviner category counts
-    context.divinerDocCount[oracleId]++;
-    for (const omen of omensList) {
-      const omenId = context.omenMapping.get(omen);
-      const current = context.omenFrequencies[oracleId].get(omenId) || 0;
-      context.omenFrequencies[oracleId].set(omenId, current + 1);
-      context.omenCount[oracleId]++;
-    }
-    context.totalTransmissions++;
   }
   

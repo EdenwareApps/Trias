@@ -10,6 +10,9 @@ import { chant } from './training.mjs';
  */
 export function norm(results, options, bestVariantFn, capitalize) {
     if (results.length) {
+      if(typeof(options.capitalize) === 'boolean') {
+        capitalize = options.capitalize
+      }
       results.forEach(result => {
         result.category = bestVariantFn(result.category);
       });
