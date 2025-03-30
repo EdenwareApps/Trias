@@ -233,4 +233,5 @@ Clears all trained data and resets the model.
 
 ## Notes
 
-- `Trias` removes infrequently used omens to maintain the model within the specified size limit.
+- `Trias` may remove infrequently used omens to maintain the model within the specified size limit.
+- You can review some examples of `Trias` usage in the [test.js](https://github.com/EdenwareApps/Trias/blob/main/test/test.js) and [test-alt.js](https://github.com/EdenwareApps/Trias/blob/main/test/test-alt.js) files.
