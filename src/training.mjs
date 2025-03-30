@@ -62,9 +62,18 @@ export function trainText(data, context) {
     }
 
     for (const category of categories) {
+      let oracleId;
       const categoryStem = context.stemmer.stem(category);
-      if (!context.categoryStemToId.has(categoryStem)) {
-        const oracleId = context.divinerGroups.length;
+      if (context.categoryStemToId.has(categoryStem)) {
+        oracleId = context.categoryStemToId.get(categoryStem);
+        const variationCounts = context.categoryVariations.get(categoryStem);
+        variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
+        if (!context.omenFrequencies[oracleId]) { // if purged, this will be undefined
+          context.omenFrequencies[oracleId] = new Map();
+          context.omenCount[oracleId] = 0;
+        }
+      } else {
+        oracleId = context.divinerGroups.length;
         context.categoryStemToId.set(categoryStem, oracleId);
         context.divinerGroups.push(categoryStem);
         context.categoryVariations.set(categoryStem, new Map());
@@ -72,11 +81,7 @@ export function trainText(data, context) {
         context.divinerDocCount[oracleId] = 0;
         context.omenCount[oracleId] = 0;
         context.omenFrequencies[oracleId] = new Map();
-      } else {
-        const variationCounts = context.categoryVariations.get(categoryStem);
-        variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
       }
-      const oracleId = context.categoryStemToId.get(categoryStem);
       // Fix: Removed duplicate increment of divinerDocCount to avoid counting the same document twice.
       context.divinerDocCount[oracleId]++;
 
@@ -86,9 +91,7 @@ export function trainText(data, context) {
         context.omenFrequencies[oracleId].set(omenId, current + 1);
         context.omenCount[oracleId]++;
       }
-      context.totalTransmissions++;
     }
+    context.totalDocuments++;
   }
 }
-
-

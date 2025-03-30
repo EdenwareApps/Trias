@@ -15,7 +15,7 @@ async function cleanup() {
 }
 
 async function testTrainingAndPrediction() {
-  console.log("Executando: testTrainingAndPrediction");
+  console.log("Executing: testTrainingAndPrediction");
 
   await cleanup();
   const oracle = new Trias({
@@ -27,30 +27,34 @@ async function testTrainingAndPrediction() {
   });
   await oracle.initialized;
 
-  // Treina com amostras para diferentes categorias
+  // Train with samples for different categories
   await oracle.train([
     {input: 'Weather forecast with sunny skies', output: 'Weather'},
     {input: 'Stock market analysis with financial news', output: 'Finance'},
-    {input: 'Culinary recipes and cooking tips', output: 'Cooking'}
+    {input: 'Culinary recipes and cooking tips', output: 'Cooking'},
+    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'},
+    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'},
+    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'},
+    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'}
   ]);
 
-  // Testa predições com textos semelhantes
+  // Test predictions with similar texts
   let prediction = await oracle.predict('Sunny forecast');
-  assert.strictEqual(prediction.toLowerCase(), 'weather', "A predição para 'Sunny forecast' deve ser 'Weather'");
+  assert.strictEqual(prediction.toLowerCase(), 'weather', "The prediction for 'Sunny forecast' should be 'Weather'");
 
   prediction = await oracle.predict('Latest financial updates');
-  assert.strictEqual(prediction.toLowerCase(), 'finance', "A predição para 'Latest financial updates' deve ser 'Finance'");
+  assert.strictEqual(prediction.toLowerCase(), 'finance', "The prediction for 'Latest financial updates' should be 'Finance'");
 
   prediction = await oracle.predict('Cooking tips and recipes');
-  assert.strictEqual(prediction.toLowerCase(), 'cooking', "A predição para 'Cooking tips and recipes' deve ser 'Cooking'");
+  assert.strictEqual(prediction.toLowerCase(), 'cooking', "The prediction for 'Cooking tips and recipes' should be 'Cooking'");
 
-  console.log("testTrainingAndPrediction passou.");
+  console.log("testTrainingAndPrediction passed.");
 }
 
 async function testSaveAndLoad() {
-  console.log("Executando: testSaveAndLoad");
+  console.log("Executing: testSaveAndLoad");
 
-  // Cria uma instância e treina
+  // Create an instance and train
   const oracle = new Trias({
     file: modelFile,
     language: 'en',
@@ -65,10 +69,10 @@ async function testSaveAndLoad() {
     {input: 'Cool Amish furniture and crafts', output: ['Amish', 'Furniture']}
   ]);
   
-  // Salva o modelo
+  // Save the model
   await oracle.save();
 
-  // Cria nova instância para carregar o modelo salvo
+  // Create a new instance to load the saved model
   const oracleReloaded = new Trias({
     file: modelFile,
     language: 'en',
@@ -79,20 +83,20 @@ async function testSaveAndLoad() {
   await oracleReloaded.initialized;
 
   // check if the model is loaded correctly, specially the properties that should be Maps or Sets, check if they are not empty
-  assert.ok(oracleReloaded.categoryStemToId.size > 0, "categoryStemToId deve ter pelo menos um elemento");
-  assert.ok(oracleReloaded.categoryVariations.size > 0, "categoryVariations deve ter pelo menos um elemento");
-  assert.ok(oracleReloaded.categoryRelations.size > 0, "categoryRelations deve ter pelo menos um elemento");
-  assert.ok(oracleReloaded.excludes instanceof Set, "excludes deve ser uma instância de Set");
+  assert.ok(oracleReloaded.categoryStemToId.size > 0, "categoryStemToId should have at least one element");
+  assert.ok(oracleReloaded.categoryVariations.size > 0, "categoryVariations should have at least one element");
+  assert.ok(oracleReloaded.categoryRelations.size > 0, "categoryRelations should have at least one element");
+  assert.ok(oracleReloaded.excludes instanceof Set, "excludes should be an instance of Set");
 
   const prediction2 = await oracleReloaded.predict('Innovative gadgets', {as: 'objects', amount: 4});
   const prediction = await oracleReloaded.predict('Innovative gadgets');
-  assert.strictEqual(prediction.toLowerCase(), 'technology', "Após carregar, a predição deve ser 'Technology'");
+  assert.strictEqual(prediction.toLowerCase(), 'technology', "After loading, the prediction should be 'Technology'");
 
-  console.log("testSaveAndLoad passou.");
+  console.log("testSaveAndLoad passed.");
 }
 
 async function testBestVariant() {
-  console.log("Executando: testBestVariant");
+  console.log("Executing: testBestVariant");
 
   const oracle = new Trias({
     file: modelFile,
@@ -103,16 +107,16 @@ async function testBestVariant() {
   });
   await oracle.initialized;
 
-  // Configura variações para uma categoria customizada
+  // Configure variations for a custom category
   oracle.categoryVariations.set('tech', new Map([['Technology', 10], ['Tech', 5]]));
   const best = oracle.bestVariant('tech');
-  assert.strictEqual(best, 'Technology', "A melhor variação para 'tech' deve ser 'Technology'");
+  assert.strictEqual(best, 'Technology', "The best variation for 'tech' should be 'Technology'");
 
-  console.log("testBestVariant passou.");
+  console.log("testBestVariant passed.");
 }
 
 async function testResetAndDestroy() {
-  console.log("Executando: testResetAndDestroy");
+  console.log("Executing: testResetAndDestroy");
 
   const oracle = new Trias({
     file: modelFile,
@@ -123,40 +127,40 @@ async function testResetAndDestroy() {
   });
   await oracle.initialized;
 
-  // Treina uma amostra e testa a predição
+  // Train a sample and test the prediction
   await oracle.train([
     {input: 'Political debate and news', output: 'Politics'}
   ]);
   let prediction = await oracle.predict('Political debate');
-  assert.strictEqual(prediction.toLowerCase(), 'politics', "Antes do reset, a predição deve ser 'Politics'");
+  assert.strictEqual(prediction.toLowerCase(), 'politics', "Before reset, the prediction should be 'Politics'");
 
-  // Reseta o modelo
+  // Reset the model
   oracle.reset();
-  // Após o reset, a predição pode retornar undefined ou valor nulo
+  // After reset, the prediction can return undefined or null
   prediction = await oracle.predict('Political debate').catch(() => null);
-  assert.ok(!prediction, "Após o reset, não deve haver predição válida");
+  assert.ok(!prediction, "After reset, there should be no valid prediction");
 
-  // Treina novamente para confirmar que o modelo continua funcional
+  // Train again to confirm that the model is still functional
   await oracle.train([
     {input: 'Health and wellness tips', output: 'Health'}
   ]);
   prediction = await oracle.predict('Wellness tips');
-  assert.strictEqual(prediction.toLowerCase(), 'health', "Após novo treinamento, a predição deve ser 'Health'");
+  assert.strictEqual(prediction.toLowerCase(), 'health', "After training again, the prediction should be 'Health'");
 
-  // Testa destroy: após destroy, métodos devem lançar erro
-  await oracle.destroy().catch(() => {}); // destroy rejeita a promise
+  // Test destroy: after destroy, methods should throw an error
+  await oracle.destroy().catch(() => {}); // destroy rejects the promise
   try {
     await oracle.predict('Any text');
-    assert.fail("Não deve ser possível predit após destroy");
+    assert.fail("It should not be possible to predict after destroy");
   } catch (err) {
-    assert.ok(err, "Erro esperado após destroy");
+    assert.ok(err, "Expected error after destroy");
   }
 
-  console.log("testResetAndDestroy passou.");
+  console.log("testResetAndDestroy passed.");
 }
 
 async function testWeightedPrediction() {
-  console.log("Executando: testWeightedPrediction");
+  console.log("Executing: testWeightedPrediction");
 
   await cleanup();
   const oracle = new Trias({
@@ -173,25 +177,25 @@ async function testWeightedPrediction() {
     {input: 'Exciting football match highlights', output: 'Sports'}
   ]);
 
-  // Testa predição ponderada utilizando objeto com pesos
+  // Test weighted prediction using an object with weights
   const weightedResults = await oracle.predict({
     'News report and current events': 0.3,
     'Exciting football match highlights': 0.7
   }, {as: 'objects', amount: 2});
   
-  assert.ok(Array.isArray(weightedResults), "A predição ponderada deve retornar um array");
-  assert.ok(weightedResults.length > 0, "Deve haver pelo menos um resultado na predição ponderada");
+  assert.ok(Array.isArray(weightedResults), "Weighted prediction should return an array");
+  assert.ok(weightedResults.length > 0, "There should be at least one result in the weighted prediction");
 
   weightedResults.forEach(result => {
-    // Cada resultado deve conter a propriedade 'score'
-    assert.ok(result.score, "Cada resultado deve possuir a propriedade 'score'");
+    // Each result must contain the 'score' property
+    assert.ok(result.score, "Each result must possess the 'score' property");
   });
 
-  console.log("testWeightedPrediction passou.");
+  console.log("testWeightedPrediction passed.");
 }
 
 async function testCategoryRelations() {
-  console.log("Executando: testCategoryRelations");
+  console.log("Executing: testCategoryRelations");
 
   await cleanup();
   const oracle = new Trias({
@@ -208,12 +212,12 @@ async function testCategoryRelations() {
     {input: 'Exciting football match highlights', output: ['Soccer', 'Sports']}
   ]);
   
-  const related = await oracle.getRelatedCategories('News', {as: 'array', amount: 2});
-  assert.ok(Array.isArray(related), "getRelatedCategories deve retornar um array");
-  assert.ok(related.length > 0, "Deve haver pelo menos um resultado na predição ponderada");
-  assert.ok(related[0] === 'Soccer', 'A primeira categoria relacionada deve ser "Soccer"');
+  const related = await oracle.related('News', {as: 'array', amount: 2});
+  assert.ok(Array.isArray(related), "related should return an array");
+  assert.ok(related.length > 0, "There should be at least one result in the weighted prediction");
+  assert.ok(related[0] === 'Soccer', 'The first related category should be "Soccer"');
 
-  console.log("testCategoryRelations passou.");
+  console.log("testCategoryRelations passed.");
 }
 
 async function runAllTests() {
@@ -224,9 +228,9 @@ async function runAllTests() {
     await testResetAndDestroy();
     await testWeightedPrediction();
     await testCategoryRelations();
-    console.log("Todos os testes passaram com sucesso.");
+    console.log("All tests passed successfully.");
   } catch (err) {
-    console.error("Falha nos testes:", err);
+    console.error("Tests failed:", err);
     process.exit(1);
   } finally {
     await cleanup();

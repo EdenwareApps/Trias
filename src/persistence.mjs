@@ -10,10 +10,14 @@ import axios from 'axios';
  */
 export function condense(data) {
     return new Promise((resolve, reject) => {
-        zlib.gzip(data, (err, condensed) => {
-            if (err) return reject(err);
-            resolve(condensed);
-        });
+        try {
+            zlib.gzip(data, (err, condensed) => {
+                if (err) return reject(err);
+                resolve(condensed);
+            });
+        } catch (err) {
+            reject(err);
+        }
     });
 }
 
@@ -24,10 +28,15 @@ export function condense(data) {
  */
 export function expand(data) {
     return new Promise((resolve, reject) => {
-        zlib.gunzip(data, (err, expanded) => {
-            if (err) return reject(err);
-            resolve(expanded);
-        });
+        if (!data.length) return reject(new Error('Data is empty'));
+        try {
+            zlib.gunzip(data, (err, expanded) => {
+                if (err) return reject(err);
+                resolve(expanded);
+            });
+        } catch (err) {
+            reject(err);
+        }
     });
 }
 

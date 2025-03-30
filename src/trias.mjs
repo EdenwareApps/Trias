@@ -22,6 +22,7 @@ export class Trias {
         weightExponent = 2,
         capitalize = false,
         excludes = [],
+        weights = {},
         size = 4096 * 1024,  // Approximate model size in bytes (limit for the prophetic tome)
         autoImport = false,  // Auto import pre-trained model if file doesn't exist
         modelUrl = 'https://edenware.app/trias/trained/{language}.trias' // URL template for pre-trained model
@@ -33,24 +34,35 @@ export class Trias {
         this.language = language;
         this.create = create;
         this.n = n;
+        this.weights = Object.assign({
+            prior: 0.01,
+            correlation: 0,
+            tfidf: 0,
+            missingOmensPenalty: 0,
+            crossEntropy: 1,
+            jaccard: 0.5,
+            cosine: 0.5,
+            gravity: 0.5
+        }, weights);
         this.stemmer = getStemmer(language);
         this.maxModelSize = size;
         this.avgOmenSize = null;  // Average size per omen (calculated from condensed model file)
 
         // Model state variables
-        this.categoryStemToId = new Map();
-        this.categoryVariations = new Map();
-        this.categoryRelations = new Map();
-        this.divinerGroups = [];
-        this.divinerDocCount = [];
-        this.omenCount = [];
-        this.omenFrequencies = [];
-        this.omenMapping = new Map();
-        this.omens = [];
-        this.omenDocFreq = [];
-        this.totalTransmissions = 0;
+        this.categoryStemToId = new Map(); // mapping of category stem to category index
+        this.categoryVariations = new Map(); // variations of each category
+        this.categoryRelations = new Map(); // co-occurrence relations between categories
+        this.divinerGroups = []; // list of diviner groups
+        this.divinerDocCount = []; // number of documents in each category
+        this.omenCount = []; // number of omens in each category
+        this.omenFrequencies = []; // frequency of each omen in each category
+        this.omenMapping = new Map(); // mapping of omen to category index
+        this.omens = []; // list of omens
+        this.omenDocFreq = []; // frequency of each omen in the entire corpus
+        this.totalDocuments = 0; // total number of transmissions (documents) in the corpus
         this.capitalize = capitalize;
         this.excludes = new Set(excludes);
+        this.gravitationalGroups = new Map();
 
         this.contextProperties = new Set([
             'n',
@@ -62,6 +74,7 @@ export class Trias {
             'create',
             'capitalize',
             'excludes',
+            'weights',
             'stemmer',
             'maxModelSize',
             'avgOmenSize',
@@ -73,13 +86,21 @@ export class Trias {
             'omenCount',
             'omenFrequencies',
             'omenMapping',
-            'omens',
+            'omens',            
             'omenDocFreq',
-            'totalTransmissions'
+            'totalDocuments',
+            'gravitationalGroups'
         ]);
 
         this.trained = Promise.resolve();
-        this.initialized = this.init();
+        
+        const ctl = {}
+        this.initialized = new Promise((resolve, reject) => {
+            ctl.resolve = resolve
+            ctl.reject = reject
+            this.init().then(resolve).catch(reject)
+        })
+        this.initialized.ctl = ctl
     }
 
     fromJSON(data) {
@@ -103,8 +124,23 @@ export class Trias {
         data.excludes = new Set(data.excludes);    
 
         // Restore omenFrequencies as an array of Maps
-        data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
-        
+        data.omenFrequencies = (data.omenFrequencies || []).map(item => 
+            new Map(
+                Object.entries(item || {}).map(([k, v]) => [Number(k), v])
+            )
+        );
+
+        // Restore gravitational groups
+        this.gravitationalGroups = new Map(
+            Object.entries(data.gravitationalGroups || {}).map(([key, group]) => [
+                key,
+                {
+                    members: new Set(group.members),
+                    strength: group.strength
+                }
+            ])
+        );
+
         return data;
     }
 
@@ -124,6 +160,16 @@ export class Trias {
             result[p] = Array.from(this[p].entries());
           } else if (p === 'omenFrequencies') {
             result[p] = this[p].map(map => Object.fromEntries(map));
+          } else if (p === 'gravitationalGroups') {
+            result[p] = Object.fromEntries(
+              [...this[p].entries()].map(([key, group]) => [
+                key,
+                {
+                  members: Array.from(group.members),
+                  strength: group.strength
+                }
+              ])
+            );
           } else {
             result[p] = this[p];
           }
@@ -132,18 +178,27 @@ export class Trias {
     }
 
     async init() {
-        try {
-            await this.load(this.file);
-        } catch (err) {
-            if (err.code === 'ENOENT' && this.create) {
+        const stat = await fs.promises.stat(this.file).catch(() => ({size: 0}));
+        if (!stat || stat.size === 0) {
+            if (this.create) {
                 this.reset();
             } else {
-                throw err;
+                throw new Error('Model file not found');
+            }
+        } else {
+            try {
+                await this.load(this.file);
+            } catch (err) {
+                if (this.create) {
+                    this.reset();
+                } else {
+                    throw new Error('Failed to load model: '+ err);
+                }
             }
         }
 
         // Handle auto-import if enabled and the model is empty
-        if (this.autoImport && this.totalTransmissions === 0) {
+        if (this.autoImport && this.totalDocuments === 0) {
             const url = this.modelUrl.replace('{language}', this.language).replace('{file}', this.file);
             try {
                 await Persistence.importModel(url, this.file);
@@ -169,6 +224,8 @@ export class Trias {
     async load(modelFile) {
         // Read and decompress the file content
         const condensedData = await fs.promises.readFile(modelFile);
+        if (!condensedData || !condensedData.length) throw new Error('Model file is empty');
+
         const jsonStr = await Persistence.expand(condensedData);
         if (!jsonStr) throw new Error('Decompressed data is empty');
         
@@ -188,13 +245,12 @@ export class Trias {
         this.omenCount = model.omenCount || [];
         this.omenDocFreq = model.omenDocFreq || [];
 
-        this.totalTransmissions = Number(model.totalTransmissions) || 0;
+        this.totalDocuments = Number(model.totalDocuments) || 0;
         this.weightExponent = Number(model.weightExponent) || 2;
 
         if (this.omens.length > 0) {
             const { size } = await fs.promises.stat(modelFile).catch(() => ({ size: 0 }));
             this.avgOmenSize = size / this.omens.length;
-
             if (size > this.maxModelSize) {
                 await this.purge();
             }
@@ -210,6 +266,7 @@ export class Trias {
     async train(text, category) {
         await this.initialized;
         let release;
+        this.preprocessed = false;
         this.trained = new Promise(resolve => release = resolve);
         if (category && !Array.isArray(text)) {
             text = [
@@ -255,6 +312,7 @@ export class Trias {
             await this.purge().catch(() => {});
         }
 
+        this.preprocessed = false;
         release();
     }
 
@@ -263,6 +321,23 @@ export class Trias {
         await this.trained;
         const results = Prediction.predictText(text, this);
         return Prediction.norm(results, options, this.bestVariant.bind(this), this.capitalize);
+    }
+
+    
+    /**
+     * Adds gravitational groups to influence predictions
+     * @param {Array[]} groups - Array of arrays of related terms
+     */
+    addGravitationalGroups(groups) {
+        for (const [groupName, terms] of Object.entries(groups)) {
+          const stemmedTerms = terms.map(term => this.stemmer.stem(term.toLowerCase()));
+          const strength = Math.sqrt(terms.length) * 2; // Strength based on size
+          
+          this.gravitationalGroups.set(groupName, {
+            members: new Set(stemmedTerms),
+            strength: strength
+          });
+        }
     }
 
     bestVariant(categoryStem) {
@@ -282,7 +357,7 @@ export class Trias {
     }
 
     /**
-     * getRelatedCategories
+     * related
      * 
      * Given an input of the type { tag1: score1, tag2: score2 },
      * returns a list of related categories that do not contain in the input.
@@ -294,7 +369,7 @@ export class Trias {
      * @param {number} amount - Limit of categories to return.
      * @returns {string[]} - List of related categories.
      */
-    getRelatedCategories(inputScores, options = { as: 'objects', amount: 5 }) {
+    related(inputScores, options = { as: 'objects', amount: 5 }) {
         const relatedScores = {};
         let found = false;
 
@@ -337,6 +412,153 @@ export class Trias {
     }
 
     /**
+     * Reduces a list of categories to a specified number of clusters,
+     * grouping them by themes based on learned co-occurrence relations.
+     * @param {string[]} categories - List of categories to be reduced.
+     * @param {Object} options - Options: { amount: desired number of clusters }.
+     * @returns {Object} - Array of arrays of categories.
+     */
+    async reduce(categories, options = { amount: 3 }) {
+        await this.initialized;
+        await this.trained;
+        const { amount, capitalize } = options;
+        const candidates = {};
+    
+        // Passo 1: Normaliza categorias para seus stems
+        const stems = {};
+        for (const category of categories) {
+            stems[category] = this.stemmer.tokenizeAndStem(category).map(c => this.omenMapping.get(c));
+        }
+        const interests = new Set(Object.values(stems).flat().filter(n => n !== undefined));
+    
+        // Passo 2: Calcula scores para cada categoria/oracleId
+        for (const [categoryStem, oracleId] of this.categoryStemToId.entries()) {
+            this.omenFrequencies[oracleId].forEach((freq, omenId) => {
+                if (interests.has(omenId)) {
+                    for (const stemId in stems) {
+                        if (!stems[stemId].includes(omenId)) continue;
+                        if (!candidates[stemId]) candidates[stemId] = {};
+                        if (typeof candidates[stemId][oracleId] === 'undefined') candidates[stemId][oracleId] = 0;
+                        candidates[stemId][oracleId] += (freq / this.omenDocFreq[omenId]) / this.divinerDocCount[oracleId];
+                    }
+                }
+            });
+        }
+    
+        // Passo 3: Criar vetores de features
+        const featureVectors = {};
+        const allOracleIds = new Set();
+        for (const stemId in candidates) {
+            for (const oracleId in candidates[stemId]) {
+                allOracleIds.add(oracleId);
+            }
+        }
+        for (const stemId in candidates) {
+            featureVectors[stemId] = {};
+            for (const oracleId of allOracleIds) {
+                featureVectors[stemId][oracleId] = candidates[stemId][oracleId] || 0;
+            }
+        }
+    
+        // Passo 4: Normalizar os vetores
+        for (const stemId in featureVectors) {
+            const vector = featureVectors[stemId];
+            const norm = Math.sqrt(Object.values(vector).reduce((sum, val) => sum + val * val, 0));
+            for (const oracleId in vector) {
+                vector[oracleId] = norm === 0 ? 0 : vector[oracleId] / norm;
+            }
+        }
+    
+        // Passo 5: Implementar K-means para clusterização
+        function euclideanDistance(vec1, vec2) {
+            let sum = 0;
+            for (const key in vec1) {
+                const diff = vec1[key] - (vec2[key] || 0);
+                sum += diff * diff;
+            }
+            return Math.sqrt(sum);
+        }
+    
+        function kmeans(vectors, k, maxIter = 100) {
+            const n = vectors.length;
+            if (n < k) return Array.from({ length: n }, (_, i) => [i]);
+    
+            const centroids = [];
+            const usedIndices = new Set();
+            while (centroids.length < k) {
+                const idx = Math.floor(Math.random() * n);
+                if (!usedIndices.has(idx)) {
+                    centroids.push({ ...vectors[idx] });
+                    usedIndices.add(idx);
+                }
+            }
+    
+            let assignments = new Array(n).fill(0);
+            for (let iter = 0; iter < maxIter; iter++) {
+                const newAssignments = vectors.map((vec) => {
+                    let minDist = Infinity;
+                    let cluster = 0;
+                    centroids.forEach((centroid, cIdx) => {
+                        const dist = euclideanDistance(vec, centroid);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            cluster = cIdx;
+                        }
+                    });
+                    return cluster;
+                });
+    
+                if (newAssignments.every((val, idx) => val === assignments[idx])) {
+                    break;
+                }
+                assignments = newAssignments;
+    
+                centroids.forEach((centroid, cIdx) => {
+                    const pointsInCluster = vectors.filter((_, idx) => assignments[idx] === cIdx);
+                    if (pointsInCluster.length === 0) return;
+                    for (const key in centroid) {
+                        centroid[key] = pointsInCluster.reduce((sum, vec) => sum + (vec[key] || 0), 0) / pointsInCluster.length;
+                    }
+                });
+            }
+    
+            const clusters = Array.from({ length: k }, () => []);
+            assignments.forEach((cluster, idx) => {
+                clusters[cluster].push(idx);
+            });
+            return clusters.filter(cluster => cluster.length > 0);
+        }
+    
+        // Executar K-means
+        const vectors = Object.values(featureVectors);
+        const categoryKeys = Object.keys(featureVectors);
+        const numClusters = Math.min(amount || 3, categoryKeys.length);
+        const clusters = kmeans(vectors, numClusters);
+    
+        // Passo 6: Calcular a soma dos scores para cada categoria
+        const categoryScores = {};
+        for (const stemId in candidates) {
+            categoryScores[stemId] = Object.values(candidates[stemId]).reduce((sum, val) => sum + val, 0);
+        }
+    
+        // Passo 7: Mapear os índices de volta para as categorias e gerar nomes dos clusters
+        const result = {};
+        clusters.forEach(cluster => {
+            const clusterCategories = cluster.map(index => categoryKeys[index]);
+            // Ordenar as categorias pelo score para pegar as 3 mais famosas
+            const sortedCategories = clusterCategories.sort((a, b) => categoryScores[b] - categoryScores[a]);
+            // Selecionar até 3 categorias (ou menos, se o cluster tiver menos de 3)
+            const topCategories = sortedCategories.slice(0, Math.min(3, sortedCategories.length));
+            // Criar o nome do cluster juntando as 3 categorias com vírgulas
+            const clusterName = topCategories.join(', ');
+            // Atribuir a lista de categorias ao cluster no objeto resultado
+            result[clusterName] = clusterCategories;
+        });
+    
+        return result;
+    }
+
+    /**
      * purge
      * 
      * Reduces the model size by removing the least frequent omens so that the total
@@ -347,50 +569,101 @@ export class Trias {
      * This ensures that the compressed model stays within the maximum size.
      */
     async purge() {
-        // Calculate the allowed number of omens based on max model size and average omen size.
         const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
-        if (this.omens.length <= allowedOmens) return;
-
-        this.isPurging = true; // set it after not returning
-        
+        if (1 ||this.omens.length <= allowedOmens) return;
+    
+        this.isPurging = true;
         let err = null;
+    
         try {
-            // Create an array of omen indices paired with their frequency (from omenCount).
-            const omenFrequencyArray = this.omenCount.map((count, idx) => ({ idx, count }));
-
-            // Sort the array in descending order based on frequency.
-            omenFrequencyArray.sort((a, b) => b.count - a.count);
-
-            // Select indices of the top allowed omens.
-            const allowedIndices = new Set(omenFrequencyArray.slice(0, allowedOmens).map(item => item.idx));
-
-            // Build new arrays for omens, omenFrequencies, and omenCount based on allowed indices.
+            // Step 1: Calculate balance statistics
+            const categoryStats = new Map();
+            for (const [categoryId, count] of this.divinerDocCount.entries()) {
+                categoryStats.set(categoryId, {
+                    currentCount: count,
+                    targetCount: Math.floor(allowedOmens / this.divinerGroups.length)
+                });
+            }
+    
+            // Step 2: Create balanced scoring matrix
+            const scoredOmens = this.omens.map((omen, idx) => {
+                const docFreq = this.omenDocFreq[idx];
+                
+                // Calculate category imbalance penalty
+                let categoryPenalty = 0;
+                for (const [categoryId, freqMap] of this.omenFrequencies.entries()) {
+                    if (freqMap.has(idx)) {
+                        const { currentCount, targetCount } = categoryStats.get(categoryId);
+                        categoryPenalty += Math.max(0, (currentCount - targetCount) / targetCount);
+                    }
+                }
+    
+                // Score = (document frequency) / (1 + category imbalance penalty)
+                return {
+                    idx,
+                    score: docFreq / (1 + categoryPenalty)
+                };
+            });
+    
+            // Step 3: Sort by balanced score
+            scoredOmens.sort((a, b) => b.score - a.score);
+            const keptIndices = new Set(scoredOmens.slice(0, allowedOmens).map(o => o.idx));
+    
+            // Step 4: Rebuild the model state
             const newOmens = [];
-            const newOmenFrequencies = [];
-            const newOmenCount = [];
-
-            for (let i = 0; i < this.omens.length; i++) {
-                if (allowedIndices.has(i)) {
-                    newOmens.push(this.omens[i]);
-                    newOmenFrequencies.push(this.omenFrequencies[i]);
-                    newOmenCount.push(this.omenCount[i]);
+            const newOmenMapping = new Map();
+            const newOmenDocFreq = [];
+            const newOmenFrequencies = this.omenFrequencies.map(() => new Map());
+            const newOmenCount = new Array(this.omenFrequencies.length).fill(0);
+            
+            for (const oldIdx of keptIndices) {
+                const newIdx = newOmens.length;
+                newOmens.push(this.omens[oldIdx]);
+                newOmenDocFreq.push(this.omenDocFreq[oldIdx]);
+                newOmenMapping.set(this.omens[oldIdx], newIdx);
+    
+                // Update category frequencies
+                for (const categoryId of this.omenFrequencies.keys()) {
+                    const freq = this.omenFrequencies[categoryId].get(oldIdx);
+                    if (freq) {
+                        newOmenFrequencies[categoryId].set(newIdx, freq);
+                        newOmenCount[categoryId] += freq;
+                    }
                 }
             }
-
-            // Update the model's omen-related properties.
+    
+            // Step 5: Apply category constraints
+            for (const categoryId of this.divinerGroups.keys()) {
+                const { targetCount } = categoryStats.get(categoryId);
+                const currentCount = newOmenCount[categoryId];
+                
+                if (currentCount > targetCount * 1.2) { // 20% tolerance
+                    const toRemove = Math.ceil(currentCount - targetCount);
+                    const freqMap = newOmenFrequencies[categoryId];
+                    
+                    // Remove less relevant omens from the category
+                    const sorted = [...freqMap.entries()].sort((a, b) => a[1] - b[1]);
+                    for (let i = 0; i < toRemove && sorted.length; i++) {
+                        const [omenIdx] = sorted.pop();
+                        freqMap.delete(omenIdx);
+                        newOmenCount[categoryId] -= freqMap.get(omenIdx) || 0;
+                    }
+                }
+            }
+    
+            // Update final state
             this.omens = newOmens;
+            this.omenMapping = newOmenMapping;
+            this.omenDocFreq = newOmenDocFreq;
             this.omenFrequencies = newOmenFrequencies;
             this.omenCount = newOmenCount;
-
-            // Rebuild the omenMapping based on the new omens array.
-            this.omenMapping = new Map(this.omens.map((omen, idx) => [omen, idx]));
-
-            await this.save();
+    
         } catch (e) {
             err = e;
         } finally {
             this.isPurging = false;
         }
+    
         if (err) throw err;
     }
 
@@ -422,11 +695,11 @@ export class Trias {
         this.omenCount = [];
         this.omenFrequencies = [];
         this.omenDocFreq = [];
-        this.totalTransmissions = 0;
+        this.totalDocuments = 0;
     }
 
     async destroy() {
         this.reset();
-        this.initialized = Promise.reject(new Error('Trias destroyed'));
+        this.initialized.ctl.reject(new Error('Trias destroyed'));
     }
 }

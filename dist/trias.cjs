@@ -8,8 +8,9 @@ var stream = require('stream');
 var require$$3$1 = require('http');
 var require$$4 = require('https');
 var require$$0$2 = require('url');
+var crypto = require('crypto');
 var require$$4$1 = require('assert');
-var require$$1$1 = require('tty');
+var require$$0$4 = require('tty');
 var require$$0$3 = require('os');
 var events = require('events');
 
@@ -40476,23 +40477,6 @@ const noop = () => {};
 const toFiniteNumber = (value, defaultValue) => {
   return value != null && Number.isFinite(value = +value) ? value : defaultValue;
 };
-const ALPHA = 'abcdefghijklmnopqrstuvwxyz';
-const DIGIT = '0123456789';
-const ALPHABET = {
-  DIGIT,
-  ALPHA,
-  ALPHA_DIGIT: ALPHA + ALPHA.toUpperCase() + DIGIT
-};
-const generateString = (size = 16, alphabet = ALPHABET.ALPHA_DIGIT) => {
-  let str = '';
-  const {
-    length
-  } = alphabet;
-  while (size--) {
-    str += alphabet[Math.random() * length | 0];
-  }
-  return str;
-};
 
 /**
  * If the thing is a FormData object, return true, otherwise return false.
@@ -40606,8 +40590,6 @@ var utils$1 = {
   findKey,
   global: _global,
   isContextDefined,
-  ALPHABET,
-  generateString,
   isSpecCompliantForm,
   toJSONObject,
   isAsyncFn,
@@ -52250,978 +52232,6 @@ function requireAsynckit() {
   return asynckit;
 }
 
-var esObjectAtoms;
-var hasRequiredEsObjectAtoms;
-function requireEsObjectAtoms() {
-  if (hasRequiredEsObjectAtoms) return esObjectAtoms;
-  hasRequiredEsObjectAtoms = 1;
-
-  /** @type {import('.')} */
-  esObjectAtoms = Object;
-  return esObjectAtoms;
-}
-
-var esErrors;
-var hasRequiredEsErrors;
-function requireEsErrors() {
-  if (hasRequiredEsErrors) return esErrors;
-  hasRequiredEsErrors = 1;
-
-  /** @type {import('.')} */
-  esErrors = Error;
-  return esErrors;
-}
-
-var _eval;
-var hasRequired_eval;
-function require_eval() {
-  if (hasRequired_eval) return _eval;
-  hasRequired_eval = 1;
-
-  /** @type {import('./eval')} */
-  _eval = EvalError;
-  return _eval;
-}
-
-var range;
-var hasRequiredRange;
-function requireRange() {
-  if (hasRequiredRange) return range;
-  hasRequiredRange = 1;
-
-  /** @type {import('./range')} */
-  range = RangeError;
-  return range;
-}
-
-var ref;
-var hasRequiredRef;
-function requireRef() {
-  if (hasRequiredRef) return ref;
-  hasRequiredRef = 1;
-
-  /** @type {import('./ref')} */
-  ref = ReferenceError;
-  return ref;
-}
-
-var syntax;
-var hasRequiredSyntax;
-function requireSyntax() {
-  if (hasRequiredSyntax) return syntax;
-  hasRequiredSyntax = 1;
-
-  /** @type {import('./syntax')} */
-  syntax = SyntaxError;
-  return syntax;
-}
-
-var type;
-var hasRequiredType;
-function requireType() {
-  if (hasRequiredType) return type;
-  hasRequiredType = 1;
-
-  /** @type {import('./type')} */
-  type = TypeError;
-  return type;
-}
-
-var uri;
-var hasRequiredUri;
-function requireUri() {
-  if (hasRequiredUri) return uri;
-  hasRequiredUri = 1;
-
-  /** @type {import('./uri')} */
-  uri = URIError;
-  return uri;
-}
-
-var abs;
-var hasRequiredAbs;
-function requireAbs() {
-  if (hasRequiredAbs) return abs;
-  hasRequiredAbs = 1;
-
-  /** @type {import('./abs')} */
-  abs = Math.abs;
-  return abs;
-}
-
-var floor;
-var hasRequiredFloor;
-function requireFloor() {
-  if (hasRequiredFloor) return floor;
-  hasRequiredFloor = 1;
-
-  /** @type {import('./floor')} */
-  floor = Math.floor;
-  return floor;
-}
-
-var max;
-var hasRequiredMax;
-function requireMax() {
-  if (hasRequiredMax) return max;
-  hasRequiredMax = 1;
-
-  /** @type {import('./max')} */
-  max = Math.max;
-  return max;
-}
-
-var min;
-var hasRequiredMin;
-function requireMin() {
-  if (hasRequiredMin) return min;
-  hasRequiredMin = 1;
-
-  /** @type {import('./min')} */
-  min = Math.min;
-  return min;
-}
-
-var pow;
-var hasRequiredPow;
-function requirePow() {
-  if (hasRequiredPow) return pow;
-  hasRequiredPow = 1;
-
-  /** @type {import('./pow')} */
-  pow = Math.pow;
-  return pow;
-}
-
-var round;
-var hasRequiredRound;
-function requireRound() {
-  if (hasRequiredRound) return round;
-  hasRequiredRound = 1;
-
-  /** @type {import('./round')} */
-  round = Math.round;
-  return round;
-}
-
-var _isNaN;
-var hasRequired_isNaN;
-function require_isNaN() {
-  if (hasRequired_isNaN) return _isNaN;
-  hasRequired_isNaN = 1;
-
-  /** @type {import('./isNaN')} */
-  _isNaN = Number.isNaN || function isNaN(a) {
-    return a !== a;
-  };
-  return _isNaN;
-}
-
-var sign;
-var hasRequiredSign;
-function requireSign() {
-  if (hasRequiredSign) return sign;
-  hasRequiredSign = 1;
-  var $isNaN = /*@__PURE__*/require_isNaN();
-
-  /** @type {import('./sign')} */
-  sign = function sign(number) {
-    if ($isNaN(number) || number === 0) {
-      return number;
-    }
-    return number < 0 ? -1 : 1;
-  };
-  return sign;
-}
-
-var gOPD;
-var hasRequiredGOPD;
-function requireGOPD() {
-  if (hasRequiredGOPD) return gOPD;
-  hasRequiredGOPD = 1;
-
-  /** @type {import('./gOPD')} */
-  gOPD = Object.getOwnPropertyDescriptor;
-  return gOPD;
-}
-
-var gopd;
-var hasRequiredGopd;
-function requireGopd() {
-  if (hasRequiredGopd) return gopd;
-  hasRequiredGopd = 1;
-
-  /** @type {import('.')} */
-  var $gOPD = /*@__PURE__*/requireGOPD();
-  if ($gOPD) {
-    try {
-      $gOPD([], 'length');
-    } catch (e) {
-      // IE 8 has a broken gOPD
-      $gOPD = null;
-    }
-  }
-  gopd = $gOPD;
-  return gopd;
-}
-
-var esDefineProperty;
-var hasRequiredEsDefineProperty;
-function requireEsDefineProperty() {
-  if (hasRequiredEsDefineProperty) return esDefineProperty;
-  hasRequiredEsDefineProperty = 1;
-
-  /** @type {import('.')} */
-  var $defineProperty = Object.defineProperty || false;
-  if ($defineProperty) {
-    try {
-      $defineProperty({}, 'a', {
-        value: 1
-      });
-    } catch (e) {
-      // IE 8 has a broken defineProperty
-      $defineProperty = false;
-    }
-  }
-  esDefineProperty = $defineProperty;
-  return esDefineProperty;
-}
-
-var shams$1;
-var hasRequiredShams$1;
-function requireShams$1() {
-  if (hasRequiredShams$1) return shams$1;
-  hasRequiredShams$1 = 1;
-
-  /** @type {import('./shams')} */
-  /* eslint complexity: [2, 18], max-statements: [2, 33] */
-  shams$1 = function hasSymbols() {
-    if (typeof Symbol !== 'function' || typeof Object.getOwnPropertySymbols !== 'function') {
-      return false;
-    }
-    if (typeof Symbol.iterator === 'symbol') {
-      return true;
-    }
-
-    /** @type {{ [k in symbol]?: unknown }} */
-    var obj = {};
-    var sym = Symbol('test');
-    var symObj = Object(sym);
-    if (typeof sym === 'string') {
-      return false;
-    }
-    if (Object.prototype.toString.call(sym) !== '[object Symbol]') {
-      return false;
-    }
-    if (Object.prototype.toString.call(symObj) !== '[object Symbol]') {
-      return false;
-    }
-
-    // temp disabled per https://github.com/ljharb/object.assign/issues/17
-    // if (sym instanceof Symbol) { return false; }
-    // temp disabled per https://github.com/WebReflection/get-own-property-symbols/issues/4
-    // if (!(symObj instanceof Symbol)) { return false; }
-
-    // if (typeof Symbol.prototype.toString !== 'function') { return false; }
-    // if (String(sym) !== Symbol.prototype.toString.call(sym)) { return false; }
-
-    var symVal = 42;
-    obj[sym] = symVal;
-    for (var _ in obj) {
-      return false;
-    } // eslint-disable-line no-restricted-syntax, no-unreachable-loop
-    if (typeof Object.keys === 'function' && Object.keys(obj).length !== 0) {
-      return false;
-    }
-    if (typeof Object.getOwnPropertyNames === 'function' && Object.getOwnPropertyNames(obj).length !== 0) {
-      return false;
-    }
-    var syms = Object.getOwnPropertySymbols(obj);
-    if (syms.length !== 1 || syms[0] !== sym) {
-      return false;
-    }
-    if (!Object.prototype.propertyIsEnumerable.call(obj, sym)) {
-      return false;
-    }
-    if (typeof Object.getOwnPropertyDescriptor === 'function') {
-      // eslint-disable-next-line no-extra-parens
-      var descriptor = /** @type {PropertyDescriptor} */Object.getOwnPropertyDescriptor(obj, sym);
-      if (descriptor.value !== symVal || descriptor.enumerable !== true) {
-        return false;
-      }
-    }
-    return true;
-  };
-  return shams$1;
-}
-
-var hasSymbols;
-var hasRequiredHasSymbols;
-function requireHasSymbols() {
-  if (hasRequiredHasSymbols) return hasSymbols;
-  hasRequiredHasSymbols = 1;
-  var origSymbol = typeof Symbol !== 'undefined' && Symbol;
-  var hasSymbolSham = requireShams$1();
-
-  /** @type {import('.')} */
-  hasSymbols = function hasNativeSymbols() {
-    if (typeof origSymbol !== 'function') {
-      return false;
-    }
-    if (typeof Symbol !== 'function') {
-      return false;
-    }
-    if (typeof origSymbol('foo') !== 'symbol') {
-      return false;
-    }
-    if (typeof Symbol('bar') !== 'symbol') {
-      return false;
-    }
-    return hasSymbolSham();
-  };
-  return hasSymbols;
-}
-
-var Reflect_getPrototypeOf;
-var hasRequiredReflect_getPrototypeOf;
-function requireReflect_getPrototypeOf() {
-  if (hasRequiredReflect_getPrototypeOf) return Reflect_getPrototypeOf;
-  hasRequiredReflect_getPrototypeOf = 1;
-
-  /** @type {import('./Reflect.getPrototypeOf')} */
-  Reflect_getPrototypeOf = typeof Reflect !== 'undefined' && Reflect.getPrototypeOf || null;
-  return Reflect_getPrototypeOf;
-}
-
-var Object_getPrototypeOf;
-var hasRequiredObject_getPrototypeOf;
-function requireObject_getPrototypeOf() {
-  if (hasRequiredObject_getPrototypeOf) return Object_getPrototypeOf;
-  hasRequiredObject_getPrototypeOf = 1;
-  var $Object = /*@__PURE__*/requireEsObjectAtoms();
-
-  /** @type {import('./Object.getPrototypeOf')} */
-  Object_getPrototypeOf = $Object.getPrototypeOf || null;
-  return Object_getPrototypeOf;
-}
-
-var implementation;
-var hasRequiredImplementation;
-function requireImplementation() {
-  if (hasRequiredImplementation) return implementation;
-  hasRequiredImplementation = 1;
-
-  /* eslint no-invalid-this: 1 */
-
-  var ERROR_MESSAGE = 'Function.prototype.bind called on incompatible ';
-  var toStr = Object.prototype.toString;
-  var max = Math.max;
-  var funcType = '[object Function]';
-  var concatty = function concatty(a, b) {
-    var arr = [];
-    for (var i = 0; i < a.length; i += 1) {
-      arr[i] = a[i];
-    }
-    for (var j = 0; j < b.length; j += 1) {
-      arr[j + a.length] = b[j];
-    }
-    return arr;
-  };
-  var slicy = function slicy(arrLike, offset) {
-    var arr = [];
-    for (var i = offset, j = 0; i < arrLike.length; i += 1, j += 1) {
-      arr[j] = arrLike[i];
-    }
-    return arr;
-  };
-  var joiny = function (arr, joiner) {
-    var str = '';
-    for (var i = 0; i < arr.length; i += 1) {
-      str += arr[i];
-      if (i + 1 < arr.length) {
-        str += joiner;
-      }
-    }
-    return str;
-  };
-  implementation = function bind(that) {
-    var target = this;
-    if (typeof target !== 'function' || toStr.apply(target) !== funcType) {
-      throw new TypeError(ERROR_MESSAGE + target);
-    }
-    var args = slicy(arguments, 1);
-    var bound;
-    var binder = function () {
-      if (this instanceof bound) {
-        var result = target.apply(this, concatty(args, arguments));
-        if (Object(result) === result) {
-          return result;
-        }
-        return this;
-      }
-      return target.apply(that, concatty(args, arguments));
-    };
-    var boundLength = max(0, target.length - args.length);
-    var boundArgs = [];
-    for (var i = 0; i < boundLength; i++) {
-      boundArgs[i] = '$' + i;
-    }
-    bound = Function('binder', 'return function (' + joiny(boundArgs, ',') + '){ return binder.apply(this,arguments); }')(binder);
-    if (target.prototype) {
-      var Empty = function Empty() {};
-      Empty.prototype = target.prototype;
-      bound.prototype = new Empty();
-      Empty.prototype = null;
-    }
-    return bound;
-  };
-  return implementation;
-}
-
-var functionBind;
-var hasRequiredFunctionBind;
-function requireFunctionBind() {
-  if (hasRequiredFunctionBind) return functionBind;
-  hasRequiredFunctionBind = 1;
-  var implementation = requireImplementation();
-  functionBind = Function.prototype.bind || implementation;
-  return functionBind;
-}
-
-var functionCall;
-var hasRequiredFunctionCall;
-function requireFunctionCall() {
-  if (hasRequiredFunctionCall) return functionCall;
-  hasRequiredFunctionCall = 1;
-
-  /** @type {import('./functionCall')} */
-  functionCall = Function.prototype.call;
-  return functionCall;
-}
-
-var functionApply;
-var hasRequiredFunctionApply;
-function requireFunctionApply() {
-  if (hasRequiredFunctionApply) return functionApply;
-  hasRequiredFunctionApply = 1;
-
-  /** @type {import('./functionApply')} */
-  functionApply = Function.prototype.apply;
-  return functionApply;
-}
-
-var reflectApply;
-var hasRequiredReflectApply;
-function requireReflectApply() {
-  if (hasRequiredReflectApply) return reflectApply;
-  hasRequiredReflectApply = 1;
-
-  /** @type {import('./reflectApply')} */
-  reflectApply = typeof Reflect !== 'undefined' && Reflect && Reflect.apply;
-  return reflectApply;
-}
-
-var actualApply;
-var hasRequiredActualApply;
-function requireActualApply() {
-  if (hasRequiredActualApply) return actualApply;
-  hasRequiredActualApply = 1;
-  var bind = requireFunctionBind();
-  var $apply = requireFunctionApply();
-  var $call = requireFunctionCall();
-  var $reflectApply = requireReflectApply();
-
-  /** @type {import('./actualApply')} */
-  actualApply = $reflectApply || bind.call($call, $apply);
-  return actualApply;
-}
-
-var callBindApplyHelpers;
-var hasRequiredCallBindApplyHelpers;
-function requireCallBindApplyHelpers() {
-  if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
-  hasRequiredCallBindApplyHelpers = 1;
-  var bind = requireFunctionBind();
-  var $TypeError = /*@__PURE__*/requireType();
-  var $call = requireFunctionCall();
-  var $actualApply = requireActualApply();
-
-  /** @type {(args: [Function, thisArg?: unknown, ...args: unknown[]]) => Function} TODO FIXME, find a way to use import('.') */
-  callBindApplyHelpers = function callBindBasic(args) {
-    if (args.length < 1 || typeof args[0] !== 'function') {
-      throw new $TypeError('a function is required');
-    }
-    return $actualApply(bind, $call, args);
-  };
-  return callBindApplyHelpers;
-}
-
-var get;
-var hasRequiredGet;
-function requireGet() {
-  if (hasRequiredGet) return get;
-  hasRequiredGet = 1;
-  var callBind = requireCallBindApplyHelpers();
-  var gOPD = /*@__PURE__*/requireGopd();
-  var hasProtoAccessor;
-  try {
-    // eslint-disable-next-line no-extra-parens, no-proto
-    hasProtoAccessor = /** @type {{ __proto__?: typeof Array.prototype }} */[].__proto__ === Array.prototype;
-  } catch (e) {
-    if (!e || typeof e !== 'object' || !('code' in e) || e.code !== 'ERR_PROTO_ACCESS') {
-      throw e;
-    }
-  }
-
-  // eslint-disable-next-line no-extra-parens
-  var desc = !!hasProtoAccessor && gOPD && gOPD(Object.prototype, /** @type {keyof typeof Object.prototype} */'__proto__');
-  var $Object = Object;
-  var $getPrototypeOf = $Object.getPrototypeOf;
-
-  /** @type {import('./get')} */
-  get = desc && typeof desc.get === 'function' ? callBind([desc.get]) : typeof $getPrototypeOf === 'function' ? /** @type {import('./get')} */function getDunder(value) {
-    // eslint-disable-next-line eqeqeq
-    return $getPrototypeOf(value == null ? value : $Object(value));
-  } : false;
-  return get;
-}
-
-var getProto;
-var hasRequiredGetProto;
-function requireGetProto() {
-  if (hasRequiredGetProto) return getProto;
-  hasRequiredGetProto = 1;
-  var reflectGetProto = requireReflect_getPrototypeOf();
-  var originalGetProto = requireObject_getPrototypeOf();
-  var getDunderProto = /*@__PURE__*/requireGet();
-
-  /** @type {import('.')} */
-  getProto = reflectGetProto ? function getProto(O) {
-    // @ts-expect-error TS can't narrow inside a closure, for some reason
-    return reflectGetProto(O);
-  } : originalGetProto ? function getProto(O) {
-    if (!O || typeof O !== 'object' && typeof O !== 'function') {
-      throw new TypeError('getProto: not an object');
-    }
-    // @ts-expect-error TS can't narrow inside a closure, for some reason
-    return originalGetProto(O);
-  } : getDunderProto ? function getProto(O) {
-    // @ts-expect-error TS can't narrow inside a closure, for some reason
-    return getDunderProto(O);
-  } : null;
-  return getProto;
-}
-
-var hasown;
-var hasRequiredHasown;
-function requireHasown() {
-  if (hasRequiredHasown) return hasown;
-  hasRequiredHasown = 1;
-  var call = Function.prototype.call;
-  var $hasOwn = Object.prototype.hasOwnProperty;
-  var bind = requireFunctionBind();
-
-  /** @type {import('.')} */
-  hasown = bind.call(call, $hasOwn);
-  return hasown;
-}
-
-var getIntrinsic;
-var hasRequiredGetIntrinsic;
-function requireGetIntrinsic() {
-  if (hasRequiredGetIntrinsic) return getIntrinsic;
-  hasRequiredGetIntrinsic = 1;
-  var undefined$1;
-  var $Object = /*@__PURE__*/requireEsObjectAtoms();
-  var $Error = /*@__PURE__*/requireEsErrors();
-  var $EvalError = /*@__PURE__*/require_eval();
-  var $RangeError = /*@__PURE__*/requireRange();
-  var $ReferenceError = /*@__PURE__*/requireRef();
-  var $SyntaxError = /*@__PURE__*/requireSyntax();
-  var $TypeError = /*@__PURE__*/requireType();
-  var $URIError = /*@__PURE__*/requireUri();
-  var abs = /*@__PURE__*/requireAbs();
-  var floor = /*@__PURE__*/requireFloor();
-  var max = /*@__PURE__*/requireMax();
-  var min = /*@__PURE__*/requireMin();
-  var pow = /*@__PURE__*/requirePow();
-  var round = /*@__PURE__*/requireRound();
-  var sign = /*@__PURE__*/requireSign();
-  var $Function = Function;
-
-  // eslint-disable-next-line consistent-return
-  var getEvalledConstructor = function (expressionSyntax) {
-    try {
-      return $Function('"use strict"; return (' + expressionSyntax + ').constructor;')();
-    } catch (e) {}
-  };
-  var $gOPD = /*@__PURE__*/requireGopd();
-  var $defineProperty = /*@__PURE__*/requireEsDefineProperty();
-  var throwTypeError = function () {
-    throw new $TypeError();
-  };
-  var ThrowTypeError = $gOPD ? function () {
-    try {
-      // eslint-disable-next-line no-unused-expressions, no-caller, no-restricted-properties
-      arguments.callee; // IE 8 does not throw here
-      return throwTypeError;
-    } catch (calleeThrows) {
-      try {
-        // IE 8 throws on Object.getOwnPropertyDescriptor(arguments, '')
-        return $gOPD(arguments, 'callee').get;
-      } catch (gOPDthrows) {
-        return throwTypeError;
-      }
-    }
-  }() : throwTypeError;
-  var hasSymbols = requireHasSymbols()();
-  var getProto = requireGetProto();
-  var $ObjectGPO = requireObject_getPrototypeOf();
-  var $ReflectGPO = requireReflect_getPrototypeOf();
-  var $apply = requireFunctionApply();
-  var $call = requireFunctionCall();
-  var needsEval = {};
-  var TypedArray = typeof Uint8Array === 'undefined' || !getProto ? undefined$1 : getProto(Uint8Array);
-  var INTRINSICS = {
-    __proto__: null,
-    '%AggregateError%': typeof AggregateError === 'undefined' ? undefined$1 : AggregateError,
-    '%Array%': Array,
-    '%ArrayBuffer%': typeof ArrayBuffer === 'undefined' ? undefined$1 : ArrayBuffer,
-    '%ArrayIteratorPrototype%': hasSymbols && getProto ? getProto([][Symbol.iterator]()) : undefined$1,
-    '%AsyncFromSyncIteratorPrototype%': undefined$1,
-    '%AsyncFunction%': needsEval,
-    '%AsyncGenerator%': needsEval,
-    '%AsyncGeneratorFunction%': needsEval,
-    '%AsyncIteratorPrototype%': needsEval,
-    '%Atomics%': typeof Atomics === 'undefined' ? undefined$1 : Atomics,
-    '%BigInt%': typeof BigInt === 'undefined' ? undefined$1 : BigInt,
-    '%BigInt64Array%': typeof BigInt64Array === 'undefined' ? undefined$1 : BigInt64Array,
-    '%BigUint64Array%': typeof BigUint64Array === 'undefined' ? undefined$1 : BigUint64Array,
-    '%Boolean%': Boolean,
-    '%DataView%': typeof DataView === 'undefined' ? undefined$1 : DataView,
-    '%Date%': Date,
-    '%decodeURI%': decodeURI,
-    '%decodeURIComponent%': decodeURIComponent,
-    '%encodeURI%': encodeURI,
-    '%encodeURIComponent%': encodeURIComponent,
-    '%Error%': $Error,
-    '%eval%': eval,
-    // eslint-disable-line no-eval
-    '%EvalError%': $EvalError,
-    '%Float16Array%': typeof Float16Array === 'undefined' ? undefined$1 : Float16Array,
-    '%Float32Array%': typeof Float32Array === 'undefined' ? undefined$1 : Float32Array,
-    '%Float64Array%': typeof Float64Array === 'undefined' ? undefined$1 : Float64Array,
-    '%FinalizationRegistry%': typeof FinalizationRegistry === 'undefined' ? undefined$1 : FinalizationRegistry,
-    '%Function%': $Function,
-    '%GeneratorFunction%': needsEval,
-    '%Int8Array%': typeof Int8Array === 'undefined' ? undefined$1 : Int8Array,
-    '%Int16Array%': typeof Int16Array === 'undefined' ? undefined$1 : Int16Array,
-    '%Int32Array%': typeof Int32Array === 'undefined' ? undefined$1 : Int32Array,
-    '%isFinite%': isFinite,
-    '%isNaN%': isNaN,
-    '%IteratorPrototype%': hasSymbols && getProto ? getProto(getProto([][Symbol.iterator]())) : undefined$1,
-    '%JSON%': typeof JSON === 'object' ? JSON : undefined$1,
-    '%Map%': typeof Map === 'undefined' ? undefined$1 : Map,
-    '%MapIteratorPrototype%': typeof Map === 'undefined' || !hasSymbols || !getProto ? undefined$1 : getProto(new Map()[Symbol.iterator]()),
-    '%Math%': Math,
-    '%Number%': Number,
-    '%Object%': $Object,
-    '%Object.getOwnPropertyDescriptor%': $gOPD,
-    '%parseFloat%': parseFloat,
-    '%parseInt%': parseInt,
-    '%Promise%': typeof Promise === 'undefined' ? undefined$1 : Promise,
-    '%Proxy%': typeof Proxy === 'undefined' ? undefined$1 : Proxy,
-    '%RangeError%': $RangeError,
-    '%ReferenceError%': $ReferenceError,
-    '%Reflect%': typeof Reflect === 'undefined' ? undefined$1 : Reflect,
-    '%RegExp%': RegExp,
-    '%Set%': typeof Set === 'undefined' ? undefined$1 : Set,
-    '%SetIteratorPrototype%': typeof Set === 'undefined' || !hasSymbols || !getProto ? undefined$1 : getProto(new Set()[Symbol.iterator]()),
-    '%SharedArrayBuffer%': typeof SharedArrayBuffer === 'undefined' ? undefined$1 : SharedArrayBuffer,
-    '%String%': String,
-    '%StringIteratorPrototype%': hasSymbols && getProto ? getProto(''[Symbol.iterator]()) : undefined$1,
-    '%Symbol%': hasSymbols ? Symbol : undefined$1,
-    '%SyntaxError%': $SyntaxError,
-    '%ThrowTypeError%': ThrowTypeError,
-    '%TypedArray%': TypedArray,
-    '%TypeError%': $TypeError,
-    '%Uint8Array%': typeof Uint8Array === 'undefined' ? undefined$1 : Uint8Array,
-    '%Uint8ClampedArray%': typeof Uint8ClampedArray === 'undefined' ? undefined$1 : Uint8ClampedArray,
-    '%Uint16Array%': typeof Uint16Array === 'undefined' ? undefined$1 : Uint16Array,
-    '%Uint32Array%': typeof Uint32Array === 'undefined' ? undefined$1 : Uint32Array,
-    '%URIError%': $URIError,
-    '%WeakMap%': typeof WeakMap === 'undefined' ? undefined$1 : WeakMap,
-    '%WeakRef%': typeof WeakRef === 'undefined' ? undefined$1 : WeakRef,
-    '%WeakSet%': typeof WeakSet === 'undefined' ? undefined$1 : WeakSet,
-    '%Function.prototype.call%': $call,
-    '%Function.prototype.apply%': $apply,
-    '%Object.defineProperty%': $defineProperty,
-    '%Object.getPrototypeOf%': $ObjectGPO,
-    '%Math.abs%': abs,
-    '%Math.floor%': floor,
-    '%Math.max%': max,
-    '%Math.min%': min,
-    '%Math.pow%': pow,
-    '%Math.round%': round,
-    '%Math.sign%': sign,
-    '%Reflect.getPrototypeOf%': $ReflectGPO
-  };
-  if (getProto) {
-    try {
-      null.error; // eslint-disable-line no-unused-expressions
-    } catch (e) {
-      // https://github.com/tc39/proposal-shadowrealm/pull/384#issuecomment-1364264229
-      var errorProto = getProto(getProto(e));
-      INTRINSICS['%Error.prototype%'] = errorProto;
-    }
-  }
-  var doEval = function doEval(name) {
-    var value;
-    if (name === '%AsyncFunction%') {
-      value = getEvalledConstructor('async function () {}');
-    } else if (name === '%GeneratorFunction%') {
-      value = getEvalledConstructor('function* () {}');
-    } else if (name === '%AsyncGeneratorFunction%') {
-      value = getEvalledConstructor('async function* () {}');
-    } else if (name === '%AsyncGenerator%') {
-      var fn = doEval('%AsyncGeneratorFunction%');
-      if (fn) {
-        value = fn.prototype;
-      }
-    } else if (name === '%AsyncIteratorPrototype%') {
-      var gen = doEval('%AsyncGenerator%');
-      if (gen && getProto) {
-        value = getProto(gen.prototype);
-      }
-    }
-    INTRINSICS[name] = value;
-    return value;
-  };
-  var LEGACY_ALIASES = {
-    __proto__: null,
-    '%ArrayBufferPrototype%': ['ArrayBuffer', 'prototype'],
-    '%ArrayPrototype%': ['Array', 'prototype'],
-    '%ArrayProto_entries%': ['Array', 'prototype', 'entries'],
-    '%ArrayProto_forEach%': ['Array', 'prototype', 'forEach'],
-    '%ArrayProto_keys%': ['Array', 'prototype', 'keys'],
-    '%ArrayProto_values%': ['Array', 'prototype', 'values'],
-    '%AsyncFunctionPrototype%': ['AsyncFunction', 'prototype'],
-    '%AsyncGenerator%': ['AsyncGeneratorFunction', 'prototype'],
-    '%AsyncGeneratorPrototype%': ['AsyncGeneratorFunction', 'prototype', 'prototype'],
-    '%BooleanPrototype%': ['Boolean', 'prototype'],
-    '%DataViewPrototype%': ['DataView', 'prototype'],
-    '%DatePrototype%': ['Date', 'prototype'],
-    '%ErrorPrototype%': ['Error', 'prototype'],
-    '%EvalErrorPrototype%': ['EvalError', 'prototype'],
-    '%Float32ArrayPrototype%': ['Float32Array', 'prototype'],
-    '%Float64ArrayPrototype%': ['Float64Array', 'prototype'],
-    '%FunctionPrototype%': ['Function', 'prototype'],
-    '%Generator%': ['GeneratorFunction', 'prototype'],
-    '%GeneratorPrototype%': ['GeneratorFunction', 'prototype', 'prototype'],
-    '%Int8ArrayPrototype%': ['Int8Array', 'prototype'],
-    '%Int16ArrayPrototype%': ['Int16Array', 'prototype'],
-    '%Int32ArrayPrototype%': ['Int32Array', 'prototype'],
-    '%JSONParse%': ['JSON', 'parse'],
-    '%JSONStringify%': ['JSON', 'stringify'],
-    '%MapPrototype%': ['Map', 'prototype'],
-    '%NumberPrototype%': ['Number', 'prototype'],
-    '%ObjectPrototype%': ['Object', 'prototype'],
-    '%ObjProto_toString%': ['Object', 'prototype', 'toString'],
-    '%ObjProto_valueOf%': ['Object', 'prototype', 'valueOf'],
-    '%PromisePrototype%': ['Promise', 'prototype'],
-    '%PromiseProto_then%': ['Promise', 'prototype', 'then'],
-    '%Promise_all%': ['Promise', 'all'],
-    '%Promise_reject%': ['Promise', 'reject'],
-    '%Promise_resolve%': ['Promise', 'resolve'],
-    '%RangeErrorPrototype%': ['RangeError', 'prototype'],
-    '%ReferenceErrorPrototype%': ['ReferenceError', 'prototype'],
-    '%RegExpPrototype%': ['RegExp', 'prototype'],
-    '%SetPrototype%': ['Set', 'prototype'],
-    '%SharedArrayBufferPrototype%': ['SharedArrayBuffer', 'prototype'],
-    '%StringPrototype%': ['String', 'prototype'],
-    '%SymbolPrototype%': ['Symbol', 'prototype'],
-    '%SyntaxErrorPrototype%': ['SyntaxError', 'prototype'],
-    '%TypedArrayPrototype%': ['TypedArray', 'prototype'],
-    '%TypeErrorPrototype%': ['TypeError', 'prototype'],
-    '%Uint8ArrayPrototype%': ['Uint8Array', 'prototype'],
-    '%Uint8ClampedArrayPrototype%': ['Uint8ClampedArray', 'prototype'],
-    '%Uint16ArrayPrototype%': ['Uint16Array', 'prototype'],
-    '%Uint32ArrayPrototype%': ['Uint32Array', 'prototype'],
-    '%URIErrorPrototype%': ['URIError', 'prototype'],
-    '%WeakMapPrototype%': ['WeakMap', 'prototype'],
-    '%WeakSetPrototype%': ['WeakSet', 'prototype']
-  };
-  var bind = requireFunctionBind();
-  var hasOwn = /*@__PURE__*/requireHasown();
-  var $concat = bind.call($call, Array.prototype.concat);
-  var $spliceApply = bind.call($apply, Array.prototype.splice);
-  var $replace = bind.call($call, String.prototype.replace);
-  var $strSlice = bind.call($call, String.prototype.slice);
-  var $exec = bind.call($call, RegExp.prototype.exec);
-
-  /* adapted from https://github.com/lodash/lodash/blob/4.17.15/dist/lodash.js#L6735-L6744 */
-  var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
-  var reEscapeChar = /\\(\\)?/g; /** Used to match backslashes in property paths. */
-  var stringToPath = function stringToPath(string) {
-    var first = $strSlice(string, 0, 1);
-    var last = $strSlice(string, -1);
-    if (first === '%' && last !== '%') {
-      throw new $SyntaxError('invalid intrinsic syntax, expected closing `%`');
-    } else if (last === '%' && first !== '%') {
-      throw new $SyntaxError('invalid intrinsic syntax, expected opening `%`');
-    }
-    var result = [];
-    $replace(string, rePropName, function (match, number, quote, subString) {
-      result[result.length] = quote ? $replace(subString, reEscapeChar, '$1') : number || match;
-    });
-    return result;
-  };
-  /* end adaptation */
-
-  var getBaseIntrinsic = function getBaseIntrinsic(name, allowMissing) {
-    var intrinsicName = name;
-    var alias;
-    if (hasOwn(LEGACY_ALIASES, intrinsicName)) {
-      alias = LEGACY_ALIASES[intrinsicName];
-      intrinsicName = '%' + alias[0] + '%';
-    }
-    if (hasOwn(INTRINSICS, intrinsicName)) {
-      var value = INTRINSICS[intrinsicName];
-      if (value === needsEval) {
-        value = doEval(intrinsicName);
-      }
-      if (typeof value === 'undefined' && !allowMissing) {
-        throw new $TypeError('intrinsic ' + name + ' exists, but is not available. Please file an issue!');
-      }
-      return {
-        alias: alias,
-        name: intrinsicName,
-        value: value
-      };
-    }
-    throw new $SyntaxError('intrinsic ' + name + ' does not exist!');
-  };
-  getIntrinsic = function GetIntrinsic(name, allowMissing) {
-    if (typeof name !== 'string' || name.length === 0) {
-      throw new $TypeError('intrinsic name must be a non-empty string');
-    }
-    if (arguments.length > 1 && typeof allowMissing !== 'boolean') {
-      throw new $TypeError('"allowMissing" argument must be a boolean');
-    }
-    if ($exec(/^%?[^%]*%?$/, name) === null) {
-      throw new $SyntaxError('`%` may not be present anywhere but at the beginning and end of the intrinsic name');
-    }
-    var parts = stringToPath(name);
-    var intrinsicBaseName = parts.length > 0 ? parts[0] : '';
-    var intrinsic = getBaseIntrinsic('%' + intrinsicBaseName + '%', allowMissing);
-    var intrinsicRealName = intrinsic.name;
-    var value = intrinsic.value;
-    var skipFurtherCaching = false;
-    var alias = intrinsic.alias;
-    if (alias) {
-      intrinsicBaseName = alias[0];
-      $spliceApply(parts, $concat([0, 1], alias));
-    }
-    for (var i = 1, isOwn = true; i < parts.length; i += 1) {
-      var part = parts[i];
-      var first = $strSlice(part, 0, 1);
-      var last = $strSlice(part, -1);
-      if ((first === '"' || first === "'" || first === '`' || last === '"' || last === "'" || last === '`') && first !== last) {
-        throw new $SyntaxError('property names with quotes must have matching quotes');
-      }
-      if (part === 'constructor' || !isOwn) {
-        skipFurtherCaching = true;
-      }
-      intrinsicBaseName += '.' + part;
-      intrinsicRealName = '%' + intrinsicBaseName + '%';
-      if (hasOwn(INTRINSICS, intrinsicRealName)) {
-        value = INTRINSICS[intrinsicRealName];
-      } else if (value != null) {
-        if (!(part in value)) {
-          if (!allowMissing) {
-            throw new $TypeError('base intrinsic for ' + name + ' exists, but the property is not available.');
-          }
-          return void 0;
-        }
-        if ($gOPD && i + 1 >= parts.length) {
-          var desc = $gOPD(value, part);
-          isOwn = !!desc;
-
-          // By convention, when a data property is converted to an accessor
-          // property to emulate a data property that does not suffer from
-          // the override mistake, that accessor's getter is marked with
-          // an `originalValue` property. Here, when we detect this, we
-          // uphold the illusion by pretending to see that original data
-          // property, i.e., returning the value rather than the getter
-          // itself.
-          if (isOwn && 'get' in desc && !('originalValue' in desc.get)) {
-            value = desc.get;
-          } else {
-            value = value[part];
-          }
-        } else {
-          isOwn = hasOwn(value, part);
-          value = value[part];
-        }
-        if (isOwn && !skipFurtherCaching) {
-          INTRINSICS[intrinsicRealName] = value;
-        }
-      }
-    }
-    return value;
-  };
-  return getIntrinsic;
-}
-
-var shams;
-var hasRequiredShams;
-function requireShams() {
-  if (hasRequiredShams) return shams;
-  hasRequiredShams = 1;
-  var hasSymbols = requireShams$1();
-
-  /** @type {import('.')} */
-  shams = function hasToStringTagShams() {
-    return hasSymbols() && !!Symbol.toStringTag;
-  };
-  return shams;
-}
-
-var esSetTostringtag;
-var hasRequiredEsSetTostringtag;
-function requireEsSetTostringtag() {
-  if (hasRequiredEsSetTostringtag) return esSetTostringtag;
-  hasRequiredEsSetTostringtag = 1;
-  var GetIntrinsic = /*@__PURE__*/requireGetIntrinsic();
-  var $defineProperty = GetIntrinsic('%Object.defineProperty%', true);
-  var hasToStringTag = requireShams()();
-  var hasOwn = /*@__PURE__*/requireHasown();
-  var $TypeError = /*@__PURE__*/requireType();
-  var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
-
-  /** @type {import('.')} */
-  esSetTostringtag = function setToStringTag(object, value) {
-    var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
-    var nonConfigurable = arguments.length > 2 && !!arguments[2] && arguments[2].nonConfigurable;
-    if (typeof overrideIfSet !== 'undefined' && typeof overrideIfSet !== 'boolean' || typeof nonConfigurable !== 'undefined' && typeof nonConfigurable !== 'boolean') {
-      throw new $TypeError('if provided, the `overrideIfSet` and `nonConfigurable` options must be booleans');
-    }
-    if (toStringTag && (overrideIfSet || !hasOwn(object, toStringTag))) {
-      if ($defineProperty) {
-        $defineProperty(object, toStringTag, {
-          configurable: !nonConfigurable,
-          enumerable: false,
-          value: value,
-          writable: false
-        });
-      } else {
-        object[toStringTag] = value; // eslint-disable-line no-param-reassign
-      }
-    }
-  };
-  return esSetTostringtag;
-}
-
 var populate;
 var hasRequiredPopulate;
 function requirePopulate() {
@@ -53252,7 +52262,6 @@ function requireForm_data() {
   var Stream = stream.Stream;
   var mime = requireMimeTypes();
   var asynckit = requireAsynckit();
-  var setToStringTag = /*@__PURE__*/requireEsSetTostringtag();
   var populate = requirePopulate();
 
   // Public API
@@ -53301,7 +52310,7 @@ function requireForm_data() {
     }
 
     // https://github.com/felixge/node-form-data/issues/38
-    if (Array.isArray(value)) {
+    if (util.isArray(value)) {
       // Please convert your array into string
       // the way web server expects it
       this._error(new Error('Arrays are not supported.'));
@@ -53336,7 +52345,7 @@ function requireForm_data() {
     this._overheadLength += Buffer.byteLength(header) + FormData.LINE_BREAK.length;
 
     // empty or either doesn't have path or not an http response or not a stream
-    if (!value || !value.path && !(value.readable && Object.prototype.hasOwnProperty.call(value, 'httpVersion')) && !(value instanceof Stream)) {
+    if (!value || !value.path && !(value.readable && value.hasOwnProperty('httpVersion')) && !(value instanceof Stream)) {
       return;
     }
 
@@ -53346,7 +52355,7 @@ function requireForm_data() {
     }
   };
   FormData.prototype._lengthRetriever = function (value, callback) {
-    if (Object.prototype.hasOwnProperty.call(value, 'fd')) {
+    if (value.hasOwnProperty('fd')) {
       // take read range into a account
       // `end` = Infinity –> read file till the end
       //
@@ -53377,11 +52386,11 @@ function requireForm_data() {
       }
 
       // or http response
-    } else if (Object.prototype.hasOwnProperty.call(value, 'httpVersion')) {
+    } else if (value.hasOwnProperty('httpVersion')) {
       callback(null, +value.headers['content-length']);
 
       // or request stream http://github.com/mikeal/request
-    } else if (Object.prototype.hasOwnProperty.call(value, 'httpModule')) {
+    } else if (value.hasOwnProperty('httpModule')) {
       // wait till response come back
       value.on('response', function (response) {
         value.pause();
@@ -53417,23 +52426,22 @@ function requireForm_data() {
     }
     var header;
     for (var prop in headers) {
-      if (Object.prototype.hasOwnProperty.call(headers, prop)) {
-        header = headers[prop];
+      if (!headers.hasOwnProperty(prop)) continue;
+      header = headers[prop];
 
-        // skip nullish headers.
-        if (header == null) {
-          continue;
-        }
+      // skip nullish headers.
+      if (header == null) {
+        continue;
+      }
 
-        // convert all headers to arrays.
-        if (!Array.isArray(header)) {
-          header = [header];
-        }
+      // convert all headers to arrays.
+      if (!Array.isArray(header)) {
+        header = [header];
+      }
 
-        // add non-empty headers.
-        if (header.length) {
-          contents += prop + ': ' + header.join('; ') + FormData.LINE_BREAK;
-        }
+      // add non-empty headers.
+      if (header.length) {
+        contents += prop + ': ' + header.join('; ') + FormData.LINE_BREAK;
       }
     }
     return '--' + this.getBoundary() + FormData.LINE_BREAK + contents + FormData.LINE_BREAK;
@@ -53448,7 +52456,7 @@ function requireForm_data() {
       // formidable and the browser add a name property
       // fs- and request- streams have path property
       filename = path$1.basename(options.filename || value.name || value.path);
-    } else if (value.readable && Object.prototype.hasOwnProperty.call(value, 'httpVersion')) {
+    } else if (value.readable && value.hasOwnProperty('httpVersion')) {
       // or try http response
       filename = path$1.basename(value.client._httpMessage.path || '');
     }
@@ -53472,7 +52480,7 @@ function requireForm_data() {
     }
 
     // or if it's http-reponse
-    if (!contentType && value.readable && Object.prototype.hasOwnProperty.call(value, 'httpVersion')) {
+    if (!contentType && value.readable && value.hasOwnProperty('httpVersion')) {
       contentType = value.headers['content-type'];
     }
 
@@ -53506,7 +52514,7 @@ function requireForm_data() {
       'content-type': 'multipart/form-data; boundary=' + this.getBoundary()
     };
     for (header in userHeaders) {
-      if (Object.prototype.hasOwnProperty.call(userHeaders, header)) {
+      if (userHeaders.hasOwnProperty(header)) {
         formHeaders[header.toLowerCase()] = userHeaders[header];
       }
     }
@@ -53680,7 +52688,6 @@ function requireForm_data() {
   FormData.prototype.toString = function () {
     return '[object FormData]';
   };
-  setToStringTag(FormData, 'FormData');
   return form_data;
 }
 
@@ -54038,6 +53045,25 @@ var transitionalDefaults = {
 
 var URLSearchParams = require$$0$2.URLSearchParams;
 
+const ALPHA = 'abcdefghijklmnopqrstuvwxyz';
+const DIGIT = '0123456789';
+const ALPHABET = {
+  DIGIT,
+  ALPHA,
+  ALPHA_DIGIT: ALPHA + ALPHA.toUpperCase() + DIGIT
+};
+const generateString = (size = 16, alphabet = ALPHABET.ALPHA_DIGIT) => {
+  let str = '';
+  const {
+    length
+  } = alphabet;
+  const randomValues = new Uint32Array(size);
+  crypto.randomFillSync(randomValues);
+  for (let i = 0; i < size; i++) {
+    str += alphabet[randomValues[i] % length];
+  }
+  return str;
+};
 var platform$1 = {
   isNode: true,
   classes: {
@@ -54045,6 +53071,8 @@ var platform$1 = {
     FormData: FormData$1,
     Blob: typeof Blob !== 'undefined' && Blob || null
   },
+  ALPHABET,
+  generateString,
   protocols: ['http', 'https', 'file', 'data']
 };
 
@@ -54667,8 +53695,9 @@ function combineURLs(baseURL, relativeURL) {
  *
  * @returns {string} The combined full path
  */
-function buildFullPath(baseURL, requestedURL) {
-  if (baseURL && !isAbsoluteURL(requestedURL)) {
+function buildFullPath(baseURL, requestedURL, allowAbsoluteUrls) {
+  let isRelativeUrl = !isAbsoluteURL(requestedURL);
+  if (baseURL && (isRelativeUrl || allowAbsoluteUrls == false)) {
     return combineURLs(baseURL, requestedURL);
   }
   return requestedURL;
@@ -55106,56 +54135,21 @@ function requireCommon() {
       createDebug.namespaces = namespaces;
       createDebug.names = [];
       createDebug.skips = [];
-      const split = (typeof namespaces === 'string' ? namespaces : '').trim().replace(' ', ',').split(',').filter(Boolean);
-      for (const ns of split) {
-        if (ns[0] === '-') {
-          createDebug.skips.push(ns.slice(1));
+      let i;
+      const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+      const len = split.length;
+      for (i = 0; i < len; i++) {
+        if (!split[i]) {
+          // ignore empty strings
+          continue;
+        }
+        namespaces = split[i].replace(/\*/g, '.*?');
+        if (namespaces[0] === '-') {
+          createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
         } else {
-          createDebug.names.push(ns);
+          createDebug.names.push(new RegExp('^' + namespaces + '$'));
         }
       }
-    }
-
-    /**
-     * Checks if the given string matches a namespace template, honoring
-     * asterisks as wildcards.
-     *
-     * @param {String} search
-     * @param {String} template
-     * @return {Boolean}
-     */
-    function matchesTemplate(search, template) {
-      let searchIndex = 0;
-      let templateIndex = 0;
-      let starIndex = -1;
-      let matchIndex = 0;
-      while (searchIndex < search.length) {
-        if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === '*')) {
-          // Match character or proceed with wildcard
-          if (template[templateIndex] === '*') {
-            starIndex = templateIndex;
-            matchIndex = searchIndex;
-            templateIndex++; // Skip the '*'
-          } else {
-            searchIndex++;
-            templateIndex++;
-          }
-        } else if (starIndex !== -1) {
-          // eslint-disable-line no-negated-condition
-          // Backtrack to the last '*' and try to match more characters
-          templateIndex = starIndex + 1;
-          matchIndex++;
-          searchIndex = matchIndex;
-        } else {
-          return false; // No match
-        }
-      }
-
-      // Handle trailing '*' in template
-      while (templateIndex < template.length && template[templateIndex] === '*') {
-        templateIndex++;
-      }
-      return templateIndex === template.length;
     }
 
     /**
@@ -55165,7 +54159,7 @@ function requireCommon() {
     * @api public
     */
     function disable() {
-      const namespaces = [...createDebug.names, ...createDebug.skips.map(namespace => '-' + namespace)].join(',');
+      const namespaces = [...createDebug.names.map(toNamespace), ...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)].join(',');
       createDebug.enable('');
       return namespaces;
     }
@@ -55178,17 +54172,33 @@ function requireCommon() {
     * @api public
     */
     function enabled(name) {
-      for (const skip of createDebug.skips) {
-        if (matchesTemplate(name, skip)) {
+      if (name[name.length - 1] === '*') {
+        return true;
+      }
+      let i;
+      let len;
+      for (i = 0, len = createDebug.skips.length; i < len; i++) {
+        if (createDebug.skips[i].test(name)) {
           return false;
         }
       }
-      for (const ns of createDebug.names) {
-        if (matchesTemplate(name, ns)) {
+      for (i = 0, len = createDebug.names.length; i < len; i++) {
+        if (createDebug.names[i].test(name)) {
           return true;
         }
       }
       return false;
+    }
+
+    /**
+    * Convert regexp to namespace
+    *
+    * @param {RegExp} regxep
+    * @return {String} namespace
+    * @api private
+    */
+    function toNamespace(regexp) {
+      return regexp.toString().substring(2, regexp.toString().length - 2).replace(/\.\*\?$/, '*');
     }
 
     /**
@@ -55275,7 +54285,6 @@ function requireBrowser() {
 
       // Is webkit? http://stackoverflow.com/a/16459606/376773
       // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-      // eslint-disable-next-line no-return-assign
       return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance ||
       // Is firebug? http://stackoverflow.com/a/398120/376773
       typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) ||
@@ -55418,11 +54427,12 @@ var hasRequiredHasFlag;
 function requireHasFlag() {
   if (hasRequiredHasFlag) return hasFlag;
   hasRequiredHasFlag = 1;
-  hasFlag = (flag, argv = process.argv) => {
+  hasFlag = (flag, argv) => {
+    argv = argv || process.argv;
     const prefix = flag.startsWith('-') ? '' : flag.length === 1 ? '-' : '--';
-    const position = argv.indexOf(prefix + flag);
-    const terminatorPosition = argv.indexOf('--');
-    return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+    const pos = argv.indexOf(prefix + flag);
+    const terminatorPos = argv.indexOf('--');
+    return pos !== -1 && (terminatorPos === -1 ? true : pos < terminatorPos);
   };
   return hasFlag;
 }
@@ -55433,25 +54443,16 @@ function requireSupportsColor() {
   if (hasRequiredSupportsColor) return supportsColor_1;
   hasRequiredSupportsColor = 1;
   const os = require$$0$3;
-  const tty = require$$1$1;
   const hasFlag = requireHasFlag();
-  const {
-    env
-  } = process;
+  const env = process.env;
   let forceColor;
-  if (hasFlag('no-color') || hasFlag('no-colors') || hasFlag('color=false') || hasFlag('color=never')) {
-    forceColor = 0;
+  if (hasFlag('no-color') || hasFlag('no-colors') || hasFlag('color=false')) {
+    forceColor = false;
   } else if (hasFlag('color') || hasFlag('colors') || hasFlag('color=true') || hasFlag('color=always')) {
-    forceColor = 1;
+    forceColor = true;
   }
   if ('FORCE_COLOR' in env) {
-    if (env.FORCE_COLOR === 'true') {
-      forceColor = 1;
-    } else if (env.FORCE_COLOR === 'false') {
-      forceColor = 0;
-    } else {
-      forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
-    }
+    forceColor = env.FORCE_COLOR.length === 0 || parseInt(env.FORCE_COLOR, 10) !== 0;
   }
   function translateLevel(level) {
     if (level === 0) {
@@ -55464,8 +54465,8 @@ function requireSupportsColor() {
       has16m: level >= 3
     };
   }
-  function supportsColor(haveStream, streamIsTTY) {
-    if (forceColor === 0) {
+  function supportsColor(stream) {
+    if (forceColor === false) {
       return 0;
     }
     if (hasFlag('color=16m') || hasFlag('color=full') || hasFlag('color=truecolor')) {
@@ -55474,24 +54475,25 @@ function requireSupportsColor() {
     if (hasFlag('color=256')) {
       return 2;
     }
-    if (haveStream && !streamIsTTY && forceColor === undefined) {
+    if (stream && !stream.isTTY && forceColor !== true) {
       return 0;
     }
-    const min = forceColor || 0;
-    if (env.TERM === 'dumb') {
-      return min;
-    }
+    const min = forceColor ? 1 : 0;
     if (process.platform === 'win32') {
-      // Windows 10 build 10586 is the first Windows release that supports 256 colors.
-      // Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+      // Node.js 7.5.0 is the first version of Node.js to include a patch to
+      // libuv that enables 256 color output on Windows. Anything earlier and it
+      // won't work. However, here we target Node.js 8 at minimum as it is an LTS
+      // release, and Node.js 7 is not. Windows 10 build 10586 is the first Windows
+      // release that supports 256 colors. Windows 10 build 14931 is the first release
+      // that supports 16m/TrueColor.
       const osRelease = os.release().split('.');
-      if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+      if (Number(process.versions.node.split('.')[0]) >= 8 && Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
         return Number(osRelease[2]) >= 14931 ? 3 : 2;
       }
       return 1;
     }
     if ('CI' in env) {
-      if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+      if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
         return 1;
       }
       return min;
@@ -55521,16 +54523,19 @@ function requireSupportsColor() {
     if ('COLORTERM' in env) {
       return 1;
     }
+    if (env.TERM === 'dumb') {
+      return min;
+    }
     return min;
   }
   function getSupportLevel(stream) {
-    const level = supportsColor(stream, stream && stream.isTTY);
+    const level = supportsColor(stream);
     return translateLevel(level);
   }
   supportsColor_1 = {
     supportsColor: getSupportLevel,
-    stdout: translateLevel(supportsColor(true, tty.isatty(1))),
-    stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+    stdout: getSupportLevel(process.stdout),
+    stderr: getSupportLevel(process.stderr)
   };
   return supportsColor_1;
 }
@@ -55543,7 +54548,7 @@ function requireNode() {
   if (hasRequiredNode) return node.exports;
   hasRequiredNode = 1;
   (function (module, exports) {
-    const tty = require$$1$1;
+    const tty = require$$0$4;
     const util = require$$1;
 
     /**
@@ -56407,7 +55412,7 @@ function requireFollowRedirects() {
 var followRedirectsExports = requireFollowRedirects();
 var followRedirects = /*@__PURE__*/getDefaultExportFromCjs(followRedirectsExports);
 
-const VERSION$1 = "1.7.9";
+const VERSION$1 = "1.8.4";
 
 function parseProtocol(url) {
   const match = /^([-+\w]{1,25})(:?\/\/|:)/.exec(url);
@@ -56583,7 +55588,7 @@ const readBlob = async function* (blob) {
   }
 };
 
-const BOUNDARY_ALPHABET = utils$1.ALPHABET.ALPHA_DIGIT + '-_';
+const BOUNDARY_ALPHABET = platform.ALPHABET.ALPHA_DIGIT + '-_';
 const textEncoder = typeof TextEncoder === 'function' ? new TextEncoder() : new require$$1.TextEncoder();
 const CRLF = '\r\n';
 const CRLF_BYTES = textEncoder.encode(CRLF);
@@ -56630,7 +55635,7 @@ const formDataToStream = (form, headersHandler, options) => {
   const {
     tag = 'form-data-boundary',
     size = 25,
-    boundary = tag + '-' + utils$1.generateString(size, BOUNDARY_ALPHABET)
+    boundary = tag + '-' + platform.generateString(size, BOUNDARY_ALPHABET)
   } = options || {};
   if (!utils$1.isFormData(form)) {
     throw TypeError('FormData instance required');
@@ -56999,7 +56004,7 @@ var httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
     }
 
     // Parse url
-    const fullPath = buildFullPath(config.baseURL, config.url);
+    const fullPath = buildFullPath(config.baseURL, config.url, config.allowAbsoluteUrls);
     const parsed = new URL(fullPath, platform.hasBrowserEnv ? platform.origin : undefined);
     const protocol = parsed.protocol || supportedProtocols[0];
     if (protocol === 'data:') {
@@ -57516,7 +56521,7 @@ var resolveConfig = config => {
     auth
   } = newConfig;
   newConfig.headers = headers = AxiosHeaders$1.from(headers);
-  newConfig.url = buildURL(buildFullPath(newConfig.baseURL, newConfig.url), config.params, config.paramsSerializer);
+  newConfig.url = buildURL(buildFullPath(newConfig.baseURL, newConfig.url, newConfig.allowAbsoluteUrls), config.params, config.paramsSerializer);
 
   // HTTP basic authentication
   if (auth) {
@@ -58269,6 +57274,13 @@ let Axios$1 = class Axios {
         }, true);
       }
     }
+
+    // Set config.allowAbsoluteUrls
+    if (config.allowAbsoluteUrls !== undefined) ; else if (this.defaults.allowAbsoluteUrls !== undefined) {
+      config.allowAbsoluteUrls = this.defaults.allowAbsoluteUrls;
+    } else {
+      config.allowAbsoluteUrls = true;
+    }
     validator.assertOptions(config, {
       baseUrl: validators.spelling('baseURL'),
       withXsrfToken: validators.spelling('withXSRFToken')
@@ -58339,7 +57351,7 @@ let Axios$1 = class Axios {
   }
   getUri(config) {
     config = mergeConfig$1(this.defaults, config);
-    const fullPath = buildFullPath(config.baseURL, config.url);
+    const fullPath = buildFullPath(config.baseURL, config.url, config.allowAbsoluteUrls);
     return buildURL(fullPath, config.params, config.paramsSerializer);
   }
 };
@@ -58689,10 +57701,14 @@ const {
  */
 function condense(data) {
   return new Promise((resolve, reject) => {
-    zlib.gzip(data, (err, condensed) => {
-      if (err) return reject(err);
-      resolve(condensed);
-    });
+    try {
+      zlib.gzip(data, (err, condensed) => {
+        if (err) return reject(err);
+        resolve(condensed);
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -58703,10 +57719,15 @@ function condense(data) {
  */
 function expand(data) {
   return new Promise((resolve, reject) => {
-    zlib.gunzip(data, (err, expanded) => {
-      if (err) return reject(err);
-      resolve(expanded);
-    });
+    if (!data.length) return reject(new Error('Data is empty'));
+    try {
+      zlib.gunzip(data, (err, expanded) => {
+        if (err) return reject(err);
+        resolve(expanded);
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -58815,9 +57836,19 @@ function trainText(data, context) {
       context.omenDocFreq[omenId]++;
     }
     for (const category of categories) {
+      let oracleId;
       const categoryStem = context.stemmer.stem(category);
-      if (!context.categoryStemToId.has(categoryStem)) {
-        const oracleId = context.divinerGroups.length;
+      if (context.categoryStemToId.has(categoryStem)) {
+        oracleId = context.categoryStemToId.get(categoryStem);
+        const variationCounts = context.categoryVariations.get(categoryStem);
+        variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
+        if (!context.omenFrequencies[oracleId]) {
+          // if purged, this will be undefined
+          context.omenFrequencies[oracleId] = new Map();
+          context.omenCount[oracleId] = 0;
+        }
+      } else {
+        oracleId = context.divinerGroups.length;
         context.categoryStemToId.set(categoryStem, oracleId);
         context.divinerGroups.push(categoryStem);
         context.categoryVariations.set(categoryStem, new Map());
@@ -58825,11 +57856,7 @@ function trainText(data, context) {
         context.divinerDocCount[oracleId] = 0;
         context.omenCount[oracleId] = 0;
         context.omenFrequencies[oracleId] = new Map();
-      } else {
-        const variationCounts = context.categoryVariations.get(categoryStem);
-        variationCounts.set(category, (variationCounts.get(category) || 0) + 1);
       }
-      const oracleId = context.categoryStemToId.get(categoryStem);
       // Fix: Removed duplicate increment of divinerDocCount to avoid counting the same document twice.
       context.divinerDocCount[oracleId]++;
       for (const omen of omensList) {
@@ -58838,8 +57865,8 @@ function trainText(data, context) {
         context.omenFrequencies[oracleId].set(omenId, current + 1);
         context.omenCount[oracleId]++;
       }
-      context.totalTransmissions++;
     }
+    context.totalDocuments++;
   }
 }
 
@@ -58905,6 +57932,61 @@ function norm(results, options, bestVariantFn, capitalize) {
       return results.map(r => r.category).join(', ');
   }
 }
+function preprocess(context) {
+  if (context.preprocessed) return;
+  context.preprocessed = {};
+
+  // Pre-process: Prior
+  const priorCache = new Map();
+  const totalDocuments = context.totalDocuments; // Total documents
+  const alpha = 0.5; // Laplace smoothing
+
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    const docsInCategory = context.divinerDocCount[oracleId];
+    const prior = Math.log((docsInCategory + alpha) / (totalDocuments + alpha * context.divinerGroups.length));
+    priorCache.set(oracleId, prior);
+  }
+  context.preprocessed.prior = priorCache;
+
+  // Pre-process: P(omen)
+  const pOmenCache = new Map();
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    const omenFreq = context.omenFrequencies[oracleId];
+    const totalOmens = context.omenCount[oracleId];
+    const omenProbMap = new Map();
+    context.omens.forEach(omenId => {
+      const freq = omenFreq.get(omenId) || 0;
+      const pOmen = (freq + 0.5) / (totalOmens + 0.5 * context.omens.length);
+      omenProbMap.set(omenId, pOmen);
+    });
+    pOmenCache.set(oracleId, omenProbMap);
+  }
+  context.preprocessed.pOmen = pOmenCache;
+
+  // Pre-process IDF
+  const idfCache = new Map();
+  context.omens.forEach(omenId => {
+    const df = context.omenDocFreq[omenId] || 0;
+    const idf = Math.log((totalDocuments + 1) / (df + 1));
+    idfCache.set(omenId, idf);
+  });
+  context.preprocessed.idf = idfCache;
+
+  // Pre-process: TF-IDF
+  const categoryTFIDF = new Map();
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    const omenFreq = context.omenFrequencies[oracleId];
+    const totalOmens = context.omenCount[oracleId];
+    const tfidfVector = new Map();
+    context.omens.forEach(omenId => {
+      const tf = (omenFreq.get(omenId) || 0) / totalOmens;
+      const idf = idfCache.get(omenId);
+      tfidfVector.set(omenId, tf * idf);
+    });
+    categoryTFIDF.set(oracleId, tfidfVector);
+  }
+  context.preprocessed.categoryTFIDF = categoryTFIDF;
+}
 
 /**
  * Predicts the diviner category for the given text using a TF-IDF-based approach.
@@ -58913,12 +57995,16 @@ function norm(results, options, bestVariantFn, capitalize) {
  * @returns {Object[]} - Array of objects with { category, score }.
  */
 function predictText(text, context) {
-  if (context.totalTransmissions === 0) return [];
+  if (context.totalDocuments === 0) return [];
+
+  // Check if the text is an object of weights
   if (typeof text === 'object' && !Array.isArray(text)) {
     return predictWeightedText(text, context);
   }
+  preprocess(context);
 
-  // Tokenize text and compute term frequencies
+  // Tokenize the text and calculate term frequencies
+  const scores = new Map();
   const omensList = chant(text, context);
   const idFreq = new Map();
   for (const omen of omensList) {
@@ -58927,51 +58013,228 @@ function predictText(text, context) {
       idFreq.set(omenId, (idFreq.get(omenId) || 0) + 1);
     }
   }
-  const scores = new Map();
-  let maxScore = -Infinity;
-  const totalTransmissions = context.totalTransmissions;
+  context.totalDocuments;
 
-  // Define a smoothing factor to adjust probabilities
-  const smoothing = 0.5; // Adjust this value as needed
+  // Use precomputed IDF
+  const idfMap = context.preprocessed.idf;
 
+  // Define the scoring algorithms using precomputed data
+  const algorithms = {
+    prior: oracleId => {
+      return context.preprocessed.prior.get(oracleId) || 0;
+    },
+    crossEntropy: oracleId => {
+      let entropy = 0;
+      idFreq.forEach((tf, omenId) => {
+        const tfidf = tf * (idfMap.get(omenId) || 0);
+        const pOmen = context.preprocessed.pOmen.get(oracleId).get(omenId) || 1e-10;
+        entropy -= tfidf * Math.log(pOmen);
+      });
+      return -entropy;
+    },
+    correlation: oracleId => {
+      const categoryVector = context.preprocessed.categoryTFIDF.get(oracleId);
+      if (!categoryVector) return 0;
+
+      // Calculate input TF-IDF vector
+      const inputVector = new Map();
+      idFreq.forEach((tf, omenId) => {
+        const idf = idfMap.get(omenId) || 0;
+        inputVector.set(omenId, tf * idf);
+      });
+
+      // Use only omens present in both vectors
+      const commonOmens = Array.from(inputVector.keys()).filter(omenId => categoryVector.has(omenId));
+      if (commonOmens.length === 0) return 0;
+      let sumA = 0,
+        sumB = 0,
+        sumAB = 0,
+        sumAA = 0,
+        sumBB = 0;
+      commonOmens.forEach(omenId => {
+        const a = inputVector.get(omenId) || 0;
+        const b = categoryVector.get(omenId) || 0;
+        sumA += a;
+        sumB += b;
+        sumAB += a * b;
+        sumAA += a * a;
+        sumBB += b * b;
+      });
+      const n = commonOmens.length;
+      const meanA = sumA / n;
+      const meanB = sumB / n;
+      const covariance = sumAB / n - meanA * meanB;
+      const varianceA = sumAA / n - meanA * meanA;
+      const varianceB = sumBB / n - meanB * meanB;
+      const stdA = Math.sqrt(varianceA);
+      const stdB = Math.sqrt(varianceB);
+      return covariance / (stdA * stdB || 1);
+    },
+    tfidf: oracleId => {
+      // cooccurrence
+      let sum = 0;
+      idFreq.forEach((tf, omenId) => {
+        if (context.omenFrequencies[oracleId]?.has(omenId)) {
+          sum += tf * (idfMap.get(omenId) || 0);
+        }
+      });
+      return sum;
+    },
+    missingOmensPenalty: oracleId => {
+      let penalty = 0;
+      context.omenFrequencies[oracleId]?.forEach((freq, omenId) => {
+        if (!idFreq.has(omenId) && freq > 10) {
+          penalty -= Math.log(freq / (context.omenCount[oracleId] + 1));
+        }
+      });
+      return penalty;
+    },
+    cosine: oracleId => {
+      const categoryVector = context.preprocessed.categoryTFIDF.get(oracleId);
+      if (!categoryVector) return 0;
+      let dotProduct = 0;
+      let normA = 0;
+      let normB = 0;
+      idFreq.forEach((tf, omenId) => {
+        const tfidfA = tf * (idfMap.get(omenId) || 0);
+        const tfidfB = categoryVector.get(omenId) || 0;
+        dotProduct += tfidfA * tfidfB;
+        normA += tfidfA ** 2;
+        normB += tfidfB ** 2;
+      });
+      return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+    },
+    jaccard: oracleId => {
+      const intersection = new Set([...idFreq.keys()].filter(omenId => context.omenFrequencies[oracleId]?.has(omenId)));
+      const unionSize = idFreq.size + context.omenFrequencies[oracleId].size - intersection.size;
+      return intersection.size / unionSize;
+    }
+  };
+
+  // First pass: Calculate raw scores
+  const rawScores = {};
+  const algorithmNames = Object.keys(algorithms);
+  algorithmNames.forEach(name => rawScores[name] = new Map());
   for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
     const docsInCategory = context.divinerDocCount[oracleId];
     if (docsInCategory === 0) continue;
-
-    // Adjusted logPrior with smoothing to reduce bias from small counts
-    const logPrior = Math.log((docsInCategory + smoothing) / (totalTransmissions + smoothing * context.divinerGroups.length));
-    let logLikelihood = 0;
-    idFreq.forEach((tf, omenId) => {
-      const df = context.omenDocFreq[omenId] || 0;
-      // Smoothing applied in IDF calculation as well
-      const idf = Math.log((totalTransmissions + 1) / (df + 1));
-      const tfidf = tf * idf;
-      const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
-      const totalOmens = context.omenCount[oracleId];
-      // Adjusted pOmen calculation with smoothing to avoid zero probabilities
-      const pOmen = (freq + smoothing) / (totalOmens + smoothing * context.omens.length);
-      logLikelihood += tfidf * Math.log(pOmen);
+    algorithmNames.forEach(algoName => {
+      if (context.weights[algoName] === undefined || context.weights[algoName] === 0) {
+        rawScores[algoName].set(categoryStem, 0);
+        return;
+      }
+      const rawScore = algorithms[algoName](oracleId);
+      rawScores[algoName].set(categoryStem, rawScore);
     });
-    const score = logPrior + logLikelihood;
-    scores.set(categoryStem, score);
-    if (score > maxScore) maxScore = score;
   }
-  let sumExp = 0;
+
+  // Calculate normalization statistics for each algorithm
+  const algoStats = {};
+  algorithmNames.forEach(algoName => {
+    const values = Array.from(rawScores[algoName].values());
+    algoStats[algoName] = {
+      min: Math.min(...values),
+      max: Math.max(...values)
+    };
+  });
+
+  // Second pass: Apply normalization and weights
+  let maxScore = -Infinity;
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    const docsInCategory = context.divinerDocCount[oracleId];
+    if (docsInCategory === 0) continue;
+    let total = 0;
+    algorithmNames.forEach(algoName => {
+      if (context.weights[algoName] === undefined || context.weights[algoName] === 0) return;
+      const raw = rawScores[algoName].get(categoryStem);
+      const {
+        min,
+        max
+      } = algoStats[algoName];
+
+      // Adaptive normalization between -1 and 1
+      let normalized = 0;
+      if (max !== min) {
+        normalized = 2 * (raw - min) / (max - min) - 1;
+      }
+      total += normalized * context.weights[algoName];
+    });
+    scores.set(categoryStem, total);
+    if (total > maxScore) maxScore = total;
+  }
   const results = [];
   scores.forEach((score, category) => {
-    const expScore = Math.exp(score - maxScore);
-    sumExp += expScore;
     results.push({
       category,
-      score: expScore
+      score: Math.exp(score - maxScore)
+    });
+  });
+  results.sort((a, b) => b.score - a.score);
+
+  // After calculating the normalized scores (results):
+  if (context.gravitationalGroups.size === 0 || context.weights.gravity <= 0) {
+    return results;
+  }
+
+  // 1. Identify groups activated by the text
+  const gravitationalBoost = new Map();
+  const samplingLimits = new Map();
+  const samplesLimit = 3;
+  const uniqueOmens = new Set(omensList.map(omen => context.stemmer.stem(omen.toLowerCase())));
+  context.gravitationalGroups.forEach((group, groupName) => {
+    let count = 0;
+    group.members.forEach(member => {
+      if (uniqueOmens.has(member)) {
+        count++;
+      }
+    });
+    if (count > 0) gravitationalBoost.set(groupName, count);
+  });
+
+  // 2. Identify groups activated by the top results
+  results.forEach(result => {
+    const categoryStem = context.stemmer.stem(result.category);
+    context.gravitationalGroups.forEach((group, groupName) => {
+      const limit = samplingLimits.get(groupName) || 0;
+      if (limit >= samplesLimit) return;
+      if (group.members.has(categoryStem)) {
+        const current = gravitationalBoost.get(groupName) || 0;
+        gravitationalBoost.set(groupName, current + result.score);
+        samplingLimits.set(groupName, limit + 1);
+      }
     });
   });
 
-  // Normalize scores to sum to 1 (softmax)
-  return results.map(r => ({
-    ...r,
-    score: r.score / sumExp
-  }));
+  // Choose the most activated groups, allowing ties, but keeping only the highest score
+  let topScore = 0;
+  gravitationalBoost.forEach((score, groupName) => {
+    if (score > topScore) {
+      topScore = score;
+    }
+  });
+  gravitationalBoost.forEach((score, groupName) => {
+    if (score === topScore) {
+      score = score / topScore;
+    } else {
+      gravitationalBoost.delete(groupName);
+    }
+  });
+  console.log({
+    topScore,
+    gravitationalBoost
+  });
+  results.forEach(result => {
+    const categoryStem = result.category;
+    gravitationalBoost.forEach((score, groupName) => {
+      if (context.gravitationalGroups.has(categoryStem)) {
+        result.score += context.weights.gravitationalGroups * score;
+      }
+    });
+  });
+
+  // Re-order with the new scores
+  results.sort((a, b) => b.score - a.score);
+  return results;
 }
 
 /**
@@ -58981,10 +58244,11 @@ function predictText(text, context) {
  * @returns {Object[]} - Array of objects with { category, score }.
  */
 function predictWeightedText(inputObj, context) {
-  if (context.totalTransmissions === 0 || context.divinerGroups.length === 0) return [];
+  if (context.totalDocuments === 0 || context.divinerGroups.length === 0) return [];
   const idFreq = new Map();
+  context.smoothing;
   const weightExponent = context.weightExponent;
-  const totalTransmissions = context.totalTransmissions;
+  const totalDocuments = context.totalDocuments;
   for (const [rawText, weight] of Object.entries(inputObj)) {
     const omensList = chant(rawText, context);
     for (const omen of omensList) {
@@ -58997,7 +58261,7 @@ function predictWeightedText(inputObj, context) {
   const tfIdf = new Map();
   idFreq.forEach((tf, omenId) => {
     const df = context.omenDocFreq[omenId] || 0;
-    const idf = Math.log((totalTransmissions + 1) / (df + 1));
+    const idf = Math.log((totalDocuments + 1) / (df + 1));
     tfIdf.set(omenId, tf * idf);
   });
   const scores = new Map();
@@ -59005,15 +58269,34 @@ function predictWeightedText(inputObj, context) {
   for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
     const docsInCategory = context.divinerDocCount[oracleId];
     if (docsInCategory === 0) continue;
-    const logPrior = Math.log(docsInCategory / totalTransmissions);
-    let logLikelihood = 0;
-    tfIdf.forEach((weight, omenId) => {
-      const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
-      const totalOmens = context.omenCount[oracleId];
-      const pOmen = (freq + 1) / (totalOmens + context.omens.length);
-      logLikelihood += weight * Math.log(pOmen);
-    });
-    const score = logPrior + logLikelihood;
+    const algorithms = {
+      prior: {
+        fn: () => {
+          return Math.log((docsInCategory + 0.5) / (totalDocuments + 0.5 * context.divinerGroups.length));
+        },
+        weight: 0.1
+      },
+      likelihood: {
+        fn: () => {
+          let logLikelihood = 0;
+          idFreq.forEach((tf, omenId) => {
+            if (!context.omenFrequencies[oracleId]) return;
+            const df = context.omenDocFreq[omenId] || 0;
+            const idf = Math.log((totalDocuments + 1) / (df + 1));
+            const tfidf = tf * idf;
+            const freq = context.omenFrequencies[oracleId].get(omenId) || 0;
+            const totalOmens = context.omenCount[oracleId];
+            const pOmen = (freq + 0.5) / (totalOmens + 0.5 * context.omens.length);
+            logLikelihood += tfidf * Math.log(pOmen);
+          });
+          return logLikelihood;
+        },
+        weight: 0.9
+      }
+    };
+    const score = Object.keys(algorithms).reduce((acc, algorithm) => {
+      return acc + algorithms[algorithm].fn() * algorithms[algorithm].weight;
+    }, 0);
     scores.set(categoryStem, score);
     if (score > maxScore) maxScore = score;
   }
@@ -59052,6 +58335,7 @@ class Trias {
     weightExponent = 2,
     capitalize = false,
     excludes = [],
+    weights = {},
     size = 4096 * 1024,
     // Approximate model size in bytes (limit for the prophetic tome)
     autoImport = false,
@@ -59065,27 +58349,44 @@ class Trias {
     this.language = language;
     this.create = create;
     this.n = n;
+    this.weights = Object.assign({
+      prior: 0.01,
+      correlation: 0,
+      tfidf: 0,
+      missingOmensPenalty: 0,
+      crossEntropy: 1,
+      jaccard: 0.5,
+      cosine: 0.5,
+      gravity: 0.5
+    }, weights);
     this.stemmer = getStemmer(language);
     this.maxModelSize = size;
     this.avgOmenSize = null; // Average size per omen (calculated from condensed model file)
 
     // Model state variables
-    this.categoryStemToId = new Map();
-    this.categoryVariations = new Map();
-    this.categoryRelations = new Map();
-    this.divinerGroups = [];
-    this.divinerDocCount = [];
-    this.omenCount = [];
-    this.omenFrequencies = [];
-    this.omenMapping = new Map();
-    this.omens = [];
-    this.omenDocFreq = [];
-    this.totalTransmissions = 0;
+    this.categoryStemToId = new Map(); // mapping of category stem to category index
+    this.categoryVariations = new Map(); // variations of each category
+    this.categoryRelations = new Map(); // co-occurrence relations between categories
+    this.divinerGroups = []; // list of diviner groups
+    this.divinerDocCount = []; // number of documents in each category
+    this.omenCount = []; // number of omens in each category
+    this.omenFrequencies = []; // frequency of each omen in each category
+    this.omenMapping = new Map(); // mapping of omen to category index
+    this.omens = []; // list of omens
+    this.omenDocFreq = []; // frequency of each omen in the entire corpus
+    this.totalDocuments = 0; // total number of transmissions (documents) in the corpus
     this.capitalize = capitalize;
     this.excludes = new Set(excludes);
-    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'stemmer', 'maxModelSize', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'categoryRelations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalTransmissions']);
+    this.gravitationalGroups = new Map();
+    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'weights', 'stemmer', 'maxModelSize', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'categoryRelations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalDocuments', 'gravitationalGroups']);
     this.trained = Promise.resolve();
-    this.initialized = this.init();
+    const ctl = {};
+    this.initialized = new Promise((resolve, reject) => {
+      ctl.resolve = resolve;
+      ctl.reject = reject;
+      this.init().then(resolve).catch(reject);
+    });
+    this.initialized.ctl = ctl;
   }
   fromJSON(data) {
     data = JSON.parse(data.toString('utf-8'));
@@ -59098,7 +58399,13 @@ class Trias {
     data.excludes = new Set(data.excludes);
 
     // Restore omenFrequencies as an array of Maps
-    data.omenFrequencies = data.omenFrequencies.map(item => new Map(Object.entries(item)));
+    data.omenFrequencies = (data.omenFrequencies || []).map(item => new Map(Object.entries(item || {}).map(([k, v]) => [Number(k), v])));
+
+    // Restore gravitational groups
+    this.gravitationalGroups = new Map(Object.entries(data.gravitationalGroups || {}).map(([key, group]) => [key, {
+      members: new Set(group.members),
+      strength: group.strength
+    }]));
     return data;
   }
   toJSON() {
@@ -59112,6 +58419,11 @@ class Trias {
         result[p] = Array.from(this[p].entries());
       } else if (p === 'omenFrequencies') {
         result[p] = this[p].map(map => Object.fromEntries(map));
+      } else if (p === 'gravitationalGroups') {
+        result[p] = Object.fromEntries([...this[p].entries()].map(([key, group]) => [key, {
+          members: Array.from(group.members),
+          strength: group.strength
+        }]));
       } else {
         result[p] = this[p];
       }
@@ -59119,18 +58431,29 @@ class Trias {
     return JSON.stringify(result, null, 2);
   }
   async init() {
-    try {
-      await this.load(this.file);
-    } catch (err) {
-      if (err.code === 'ENOENT' && this.create) {
+    const stat = await fs.promises.stat(this.file).catch(() => ({
+      size: 0
+    }));
+    if (!stat || stat.size === 0) {
+      if (this.create) {
         this.reset();
       } else {
-        throw err;
+        throw new Error('Model file not found');
+      }
+    } else {
+      try {
+        await this.load(this.file);
+      } catch (err) {
+        if (this.create) {
+          this.reset();
+        } else {
+          throw new Error('Failed to load model: ' + err);
+        }
       }
     }
 
     // Handle auto-import if enabled and the model is empty
-    if (this.autoImport && this.totalTransmissions === 0) {
+    if (this.autoImport && this.totalDocuments === 0) {
       const url = this.modelUrl.replace('{language}', this.language).replace('{file}', this.file);
       try {
         await importModel(url, this.file);
@@ -59158,6 +58481,7 @@ class Trias {
   async load(modelFile) {
     // Read and decompress the file content
     const condensedData = await fs.promises.readFile(modelFile);
+    if (!condensedData || !condensedData.length) throw new Error('Model file is empty');
     const jsonStr = await expand(condensedData);
     if (!jsonStr) throw new Error('Decompressed data is empty');
     const model = this.fromJSON(jsonStr);
@@ -59174,7 +58498,7 @@ class Trias {
     this.divinerDocCount = model.divinerDocCount || [];
     this.omenCount = model.omenCount || [];
     this.omenDocFreq = model.omenDocFreq || [];
-    this.totalTransmissions = Number(model.totalTransmissions) || 0;
+    this.totalDocuments = Number(model.totalDocuments) || 0;
     this.weightExponent = Number(model.weightExponent) || 2;
     if (this.omens.length > 0) {
       const {
@@ -59196,6 +58520,7 @@ class Trias {
   async train(text, category) {
     await this.initialized;
     let release;
+    this.preprocessed = false;
     this.trained = new Promise(resolve => release = resolve);
     if (category && !Array.isArray(text)) {
       text = [{
@@ -59241,6 +58566,7 @@ class Trias {
       // tame the model size
       await this.purge().catch(() => {});
     }
+    this.preprocessed = false;
     release();
   }
   async predict(text, options = {
@@ -59251,6 +58577,22 @@ class Trias {
     await this.trained;
     const results = predictText(text, this);
     return norm(results, options, this.bestVariant.bind(this), this.capitalize);
+  }
+
+  /**
+   * Adds gravitational groups to influence predictions
+   * @param {Array[]} groups - Array of arrays of related terms
+   */
+  addGravitationalGroups(groups) {
+    for (const [groupName, terms] of Object.entries(groups)) {
+      const stemmedTerms = terms.map(term => this.stemmer.stem(term.toLowerCase()));
+      const strength = Math.sqrt(terms.length) * 2; // Strength based on size
+
+      this.gravitationalGroups.set(groupName, {
+        members: new Set(stemmedTerms),
+        strength: strength
+      });
+    }
   }
   bestVariant(categoryStem) {
     const variationCounts = this.categoryVariations.get(categoryStem);
@@ -59269,7 +58611,7 @@ class Trias {
   }
 
   /**
-   * getRelatedCategories
+   * related
    * 
    * Given an input of the type { tag1: score1, tag2: score2 },
    * returns a list of related categories that do not contain in the input.
@@ -59281,7 +58623,7 @@ class Trias {
    * @param {number} amount - Limit of categories to return.
    * @returns {string[]} - List of related categories.
    */
-  getRelatedCategories(inputScores, options = {
+  related(inputScores, options = {
     as: 'objects',
     amount: 5
   }) {
@@ -59327,6 +58669,157 @@ class Trias {
   }
 
   /**
+   * Reduces a list of categories to a specified number of clusters,
+   * grouping them by themes based on learned co-occurrence relations.
+   * @param {string[]} categories - List of categories to be reduced.
+   * @param {Object} options - Options: { amount: desired number of clusters }.
+   * @returns {Object} - Array of arrays of categories.
+   */
+  async reduce(categories, options = {
+    amount: 3
+  }) {
+    await this.initialized;
+    await this.trained;
+    const {
+      amount,
+      capitalize
+    } = options;
+    const candidates = {};
+
+    // Passo 1: Normaliza categorias para seus stems
+    const stems = {};
+    for (const category of categories) {
+      stems[category] = this.stemmer.tokenizeAndStem(category).map(c => this.omenMapping.get(c));
+    }
+    const interests = new Set(Object.values(stems).flat().filter(n => n !== undefined));
+
+    // Passo 2: Calcula scores para cada categoria/oracleId
+    for (const [categoryStem, oracleId] of this.categoryStemToId.entries()) {
+      this.omenFrequencies[oracleId].forEach((freq, omenId) => {
+        if (interests.has(omenId)) {
+          for (const stemId in stems) {
+            if (!stems[stemId].includes(omenId)) continue;
+            if (!candidates[stemId]) candidates[stemId] = {};
+            if (typeof candidates[stemId][oracleId] === 'undefined') candidates[stemId][oracleId] = 0;
+            candidates[stemId][oracleId] += freq / this.omenDocFreq[omenId] / this.divinerDocCount[oracleId];
+          }
+        }
+      });
+    }
+
+    // Passo 3: Criar vetores de features
+    const featureVectors = {};
+    const allOracleIds = new Set();
+    for (const stemId in candidates) {
+      for (const oracleId in candidates[stemId]) {
+        allOracleIds.add(oracleId);
+      }
+    }
+    for (const stemId in candidates) {
+      featureVectors[stemId] = {};
+      for (const oracleId of allOracleIds) {
+        featureVectors[stemId][oracleId] = candidates[stemId][oracleId] || 0;
+      }
+    }
+
+    // Passo 4: Normalizar os vetores
+    for (const stemId in featureVectors) {
+      const vector = featureVectors[stemId];
+      const norm = Math.sqrt(Object.values(vector).reduce((sum, val) => sum + val * val, 0));
+      for (const oracleId in vector) {
+        vector[oracleId] = norm === 0 ? 0 : vector[oracleId] / norm;
+      }
+    }
+
+    // Passo 5: Implementar K-means para clusterização
+    function euclideanDistance(vec1, vec2) {
+      let sum = 0;
+      for (const key in vec1) {
+        const diff = vec1[key] - (vec2[key] || 0);
+        sum += diff * diff;
+      }
+      return Math.sqrt(sum);
+    }
+    function kmeans(vectors, k, maxIter = 100) {
+      const n = vectors.length;
+      if (n < k) return Array.from({
+        length: n
+      }, (_, i) => [i]);
+      const centroids = [];
+      const usedIndices = new Set();
+      while (centroids.length < k) {
+        const idx = Math.floor(Math.random() * n);
+        if (!usedIndices.has(idx)) {
+          centroids.push({
+            ...vectors[idx]
+          });
+          usedIndices.add(idx);
+        }
+      }
+      let assignments = new Array(n).fill(0);
+      for (let iter = 0; iter < maxIter; iter++) {
+        const newAssignments = vectors.map(vec => {
+          let minDist = Infinity;
+          let cluster = 0;
+          centroids.forEach((centroid, cIdx) => {
+            const dist = euclideanDistance(vec, centroid);
+            if (dist < minDist) {
+              minDist = dist;
+              cluster = cIdx;
+            }
+          });
+          return cluster;
+        });
+        if (newAssignments.every((val, idx) => val === assignments[idx])) {
+          break;
+        }
+        assignments = newAssignments;
+        centroids.forEach((centroid, cIdx) => {
+          const pointsInCluster = vectors.filter((_, idx) => assignments[idx] === cIdx);
+          if (pointsInCluster.length === 0) return;
+          for (const key in centroid) {
+            centroid[key] = pointsInCluster.reduce((sum, vec) => sum + (vec[key] || 0), 0) / pointsInCluster.length;
+          }
+        });
+      }
+      const clusters = Array.from({
+        length: k
+      }, () => []);
+      assignments.forEach((cluster, idx) => {
+        clusters[cluster].push(idx);
+      });
+      return clusters.filter(cluster => cluster.length > 0);
+    }
+
+    // Executar K-means
+    const vectors = Object.values(featureVectors);
+    const categoryKeys = Object.keys(featureVectors);
+    const numClusters = Math.min(amount || 3, categoryKeys.length);
+    const clusters = kmeans(vectors, numClusters);
+
+    // Passo 6: Calcular a soma dos scores para cada categoria
+    const categoryScores = {};
+    for (const stemId in candidates) {
+      categoryScores[stemId] = Object.values(candidates[stemId]).reduce((sum, val) => sum + val, 0);
+    }
+
+    // Passo 7: Mapear os índices de volta para as categorias e gerar nomes dos clusters
+    const result = {};
+    clusters.forEach(cluster => {
+      const clusterCategories = cluster.map(index => categoryKeys[index]);
+      // Ordenar as categorias pelo score para pegar as 3 mais famosas
+      const sortedCategories = clusterCategories.sort((a, b) => categoryScores[b] - categoryScores[a]);
+      // Selecionar até 3 categorias (ou menos, se o cluster tiver menos de 3)
+      const topCategories = sortedCategories.slice(0, Math.min(3, sortedCategories.length));
+      // Criar o nome do cluster juntando as 3 categorias com vírgulas
+      const clusterName = topCategories.join(', ');
+      // Atribuir a lista de categorias ao cluster no objeto resultado
+      result[clusterName] = clusterCategories;
+    });
+    return result;
+  }
+
+  /**
    * purge
    * 
    * Reduces the model size by removing the least frequent omens so that the total
@@ -59337,51 +58830,8 @@ class Trias {
    * This ensures that the compressed model stays within the maximum size.
    */
   async purge() {
-    // Calculate the allowed number of omens based on max model size and average omen size.
-    const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
-    if (this.omens.length <= allowedOmens) return;
-    this.isPurging = true; // set it after not returning
-
-    let err = null;
-    try {
-      // Create an array of omen indices paired with their frequency (from omenCount).
-      const omenFrequencyArray = this.omenCount.map((count, idx) => ({
-        idx,
-        count
-      }));
-
-      // Sort the array in descending order based on frequency.
-      omenFrequencyArray.sort((a, b) => b.count - a.count);
-
-      // Select indices of the top allowed omens.
-      const allowedIndices = new Set(omenFrequencyArray.slice(0, allowedOmens).map(item => item.idx));
-
-      // Build new arrays for omens, omenFrequencies, and omenCount based on allowed indices.
-      const newOmens = [];
-      const newOmenFrequencies = [];
-      const newOmenCount = [];
-      for (let i = 0; i < this.omens.length; i++) {
-        if (allowedIndices.has(i)) {
-          newOmens.push(this.omens[i]);
-          newOmenFrequencies.push(this.omenFrequencies[i]);
-          newOmenCount.push(this.omenCount[i]);
-        }
-      }
-
-      // Update the model's omen-related properties.
-      this.omens = newOmens;
-      this.omenFrequencies = newOmenFrequencies;
-      this.omenCount = newOmenCount;
-
-      // Rebuild the omenMapping based on the new omens array.
-      this.omenMapping = new Map(this.omens.map((omen, idx) => [omen, idx]));
-      await this.save();
-    } catch (e) {
-      err = e;
-    } finally {
-      this.isPurging = false;
-    }
-    if (err) throw err;
+    Math.floor(this.maxModelSize / this.avgOmenSize);
+    return;
   }
   async save() {
     this.isSaving = true;
@@ -59414,11 +58864,11 @@ class Trias {
     this.omenCount = [];
     this.omenFrequencies = [];
     this.omenDocFreq = [];
-    this.totalTransmissions = 0;
+    this.totalDocuments = 0;
   }
   async destroy() {
     this.reset();
-    this.initialized = Promise.reject(new Error('Trias destroyed'));
+    this.initialized.ctl.reject(new Error('Trias destroyed'));
   }
 }
 

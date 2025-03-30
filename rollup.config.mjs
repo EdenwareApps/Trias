@@ -10,7 +10,9 @@ export default {
     format: 'cjs'
   },
   plugins: [
-    nodeResolve(),
+    nodeResolve({
+      preferBuiltins: true
+    }),
     commonjs(),
     json(),
     babel({
