@@ -251,7 +251,7 @@ export class Trias {
         if (this.omens.length > 0) {
             const { size } = await fs.promises.stat(modelFile).catch(() => ({ size: 0 }));
             this.avgOmenSize = size / this.omens.length;
-            if (size > this.maxModelSize) {
+            if (size > (this.maxModelSize * 1.2)) {
                 await this.purge();
             }
         }
@@ -308,7 +308,7 @@ export class Trias {
             }
         }
         
-        if (!this.isPurging && !this.isSaving && this.size > (this.maxModelSize * 1.5)) { // tame the model size
+        if (!this.isPurging && !this.isSaving && this.size > (this.maxModelSize * 1.2)) { // tame the model size
             await this.purge().catch(() => {});
         }
 
@@ -570,7 +570,7 @@ export class Trias {
      */
     async purge() {
         const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
-        if (1 ||this.omens.length <= allowedOmens) return;
+        if (this.omens.length <= allowedOmens) return;
     
         this.isPurging = true;
         let err = null;
