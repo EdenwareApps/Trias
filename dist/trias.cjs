@@ -59393,7 +59393,7 @@ class Trias {
     this.capitalize = capitalize;
     this.excludes = new Set(excludes);
     this.gravitationalGroups = new Map();
-    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'weights', 'stemmer', 'maxModelSize', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'categoryRelations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalDocuments', 'gravitationalGroups']);
+    this.contextProperties = new Set(['n', 'file', 'autoImport', 'weightExponent', 'modelUrl', 'language', 'create', 'capitalize', 'excludes', 'weights', 'stemmer', 'avgOmenSize', 'categoryStemToId', 'categoryVariations', 'categoryRelations', 'divinerGroups', 'divinerDocCount', 'omenCount', 'omenFrequencies', 'omenMapping', 'omens', 'omenDocFreq', 'totalDocuments', 'gravitationalGroups']);
     this.trained = Promise.resolve();
     const ctl = {};
     this.initialized = new Promise((resolve, reject) => {
@@ -59515,22 +59515,27 @@ class Trias {
     this.omenDocFreq = model.omenDocFreq || [];
     this.totalDocuments = Number(model.totalDocuments) || 0;
     this.weightExponent = Number(model.weightExponent) || 2;
-    if (this.omens.length > 0) {
-      const {
-        size
-      } = await fs.promises.stat(modelFile).catch(() => ({
-        size: 0
-      }));
-      this.avgOmenSize = size / this.omens.length;
-      if (size > this.maxModelSize * 1.2) {
-        await this.purge();
-      }
+    if (await this.overloaded()) {
+      await this.save(true); // save() will purge() if needed
     }
     return true;
   }
   get size() {
     if (this.avgOmenSize > 0) return this.omens.length * this.avgOmenSize;
     return 0;
+  }
+  async overloaded() {
+    if (!this.avgOmenSize || isNaN(this.avgOmenSize)) {
+      const {
+        size
+      } = await fs.promises.stat(this.file).catch(() => ({
+        size: 0
+      }));
+      if (!size) return false;
+      this.avgOmenSize = size / this.omens.length;
+    }
+    const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
+    return !isNaN(allowedOmens) && allowedOmens > 0 && this.omens.length > allowedOmens;
   }
   async train(text, category) {
     await this.initialized;
@@ -59577,7 +59582,7 @@ class Trias {
         }
       }
     }
-    if (!this.isPurging && !this.isSaving && this.size > this.maxModelSize * 1.2) {
+    if (!this.isPurging && !this.isSaving && (await this.overloaded())) {
       // tame the model size
       await this.purge().catch(() => {});
     }
@@ -59684,45 +59689,59 @@ class Trias {
   }
 
   /**
-   * Reduces a list of categories to a specified number of clusters,
-   * grouping them by themes based on learned co-occurrence relations.
-   * @param {string[]} categories - List of categories to be reduced.
-   * @param {Object} options - Options: { amount: desired number of clusters }.
-   * @returns {Object} - Array of arrays of categories.
-   */
+  * Reduces a list of categories to a specified number of clusters,
+  * grouping them by themes based on learned co-occurrence relations.
+  * @param {string[]|Object} categories - List of categories or object with categories and scores.
+  * @param {Object} options - Options: { amount: desired number of clusters }.
+  * @returns {Object} - Object mapping cluster names to arrays of categories.
+  */
   async reduce(categories, options = {
     amount: 3
   }) {
     await this.initialized;
     await this.trained;
     const {
-      amount,
-      capitalize
+      amount
     } = options;
+
+    // Step 1: Convert input to an object with scores
+    let inputScores;
+    if (Array.isArray(categories)) {
+      inputScores = {};
+      for (const category of categories) {
+        inputScores[category] = 1;
+      }
+    } else if (typeof categories === 'object' && categories !== null) {
+      inputScores = categories;
+    } else {
+      throw new Error('Invalid categories type');
+    }
     const candidates = {};
 
-    // Passo 1: Normaliza categorias para seus stems
+    // Step 2: Normalize categories to their stems and collect all relevant omens
     const stems = {};
-    for (const category of categories) {
+    const allCategories = Object.keys(inputScores);
+    for (const category of allCategories) {
       stems[category] = this.stemmer.tokenizeAndStem(category).map(c => this.omenMapping.get(c));
     }
     const interests = new Set(Object.values(stems).flat().filter(n => n !== undefined));
 
-    // Passo 2: Calcula scores para cada categoria/oracleId
+    // Step 3: Calculate scores for each category/oracleId, weighted by input scores
     for (const [categoryStem, oracleId] of this.categoryStemToId.entries()) {
       this.omenFrequencies[oracleId].forEach((freq, omenId) => {
         if (interests.has(omenId)) {
-          for (const stemId in stems) {
+          for (const stemId of allCategories) {
             if (!stems[stemId].includes(omenId)) continue;
             if (!candidates[stemId]) candidates[stemId] = {};
             if (typeof candidates[stemId][oracleId] === 'undefined') candidates[stemId][oracleId] = 0;
-            candidates[stemId][oracleId] += freq / this.omenDocFreq[omenId] / this.divinerDocCount[oracleId];
+            const categoryScore = inputScores[stemId] || 0;
+            candidates[stemId][oracleId] += categoryScore * (freq / this.omenDocFreq[omenId]) / this.divinerDocCount[oracleId];
           }
         }
       });
     }
 
-    // Passo 3: Criar vetores de features
+    // Step 4: Create feature vectors for all categories
     const featureVectors = {};
     const allOracleIds = new Set();
     for (const stemId in candidates) {
@@ -59730,14 +59749,22 @@ class Trias {
         allOracleIds.add(oracleId);
       }
     }
-    for (const stemId in candidates) {
+
+    // Initialize vectors for all categories, even those without candidates
+    for (const stemId of allCategories) {
       featureVectors[stemId] = {};
+      const hasData = candidates[stemId] && Object.keys(candidates[stemId]).length > 0;
       for (const oracleId of allOracleIds) {
-        featureVectors[stemId][oracleId] = candidates[stemId][oracleId] || 0;
+        if (hasData) {
+          featureVectors[stemId][oracleId] = candidates[stemId][oracleId] || 0;
+        } else {
+          // Assign a small random value to avoid identical vectors
+          featureVectors[stemId][oracleId] = Math.random() * 0.01;
+        }
       }
     }
 
-    // Passo 4: Normalizar os vetores
+    // Step 5: Normalize vectors
     for (const stemId in featureVectors) {
       const vector = featureVectors[stemId];
       const norm = Math.sqrt(Object.values(vector).reduce((sum, val) => sum + val * val, 0));
@@ -59746,7 +59773,7 @@ class Trias {
       }
     }
 
-    // Passo 5: Implementar K-means para clusterização
+    // Step 6: Implement K-means for clustering with K-means++
     function euclideanDistance(vec1, vec2) {
       let sum = 0;
       for (const key in vec1) {
@@ -59755,22 +59782,41 @@ class Trias {
       }
       return Math.sqrt(sum);
     }
-    function kmeans(vectors, k, maxIter = 100) {
+    function kmeansPlusPlusInit(vectors, k) {
+      const centroids = [];
+      const n = vectors.length;
+      const firstIdx = Math.floor(Math.random() * n);
+      centroids.push({
+        ...vectors[firstIdx]
+      });
+      for (let i = 1; i < k; i++) {
+        const distances = vectors.map(vec => {
+          const minDist = Math.min(...centroids.map(centroid => euclideanDistance(vec, centroid)));
+          return minDist ** 2;
+        });
+        const totalDist = distances.reduce((sum, d) => sum + d, 0);
+        const randVal = Math.random() * totalDist;
+        let cumulative = 0;
+        let nextIdx = 0;
+        for (let j = 0; j < n; j++) {
+          cumulative += distances[j];
+          if (cumulative >= randVal) {
+            nextIdx = j;
+            break;
+          }
+        }
+        centroids.push({
+          ...vectors[nextIdx]
+        });
+      }
+      return centroids;
+    }
+    function kmeans(vectors, k, maxIter = 300) {
       const n = vectors.length;
       if (n < k) return Array.from({
         length: n
       }, (_, i) => [i]);
-      const centroids = [];
-      const usedIndices = new Set();
-      while (centroids.length < k) {
-        const idx = Math.floor(Math.random() * n);
-        if (!usedIndices.has(idx)) {
-          centroids.push({
-            ...vectors[idx]
-          });
-          usedIndices.add(idx);
-        }
-      }
+      const centroids = kmeansPlusPlusInit(vectors, k);
       let assignments = new Array(n).fill(0);
       for (let iter = 0; iter < maxIter; iter++) {
         const newAssignments = vectors.map(vec => {
@@ -59806,29 +59852,41 @@ class Trias {
       return clusters.filter(cluster => cluster.length > 0);
     }
 
-    // Executar K-means
+    // Execute K-means
     const vectors = Object.values(featureVectors);
     const categoryKeys = Object.keys(featureVectors);
     const numClusters = Math.min(amount || 3, categoryKeys.length);
-    const clusters = kmeans(vectors, numClusters);
+    let clusters = kmeans(vectors, numClusters);
 
-    // Passo 6: Calcular a soma dos scores para cada categoria
-    const categoryScores = {};
-    for (const stemId in candidates) {
-      categoryScores[stemId] = Object.values(candidates[stemId]).reduce((sum, val) => sum + val, 0);
+    // Step 7: Split large clusters if necessary
+    while (clusters.length < numClusters && clusters.some(cluster => cluster.length > 1)) {
+      const largestClusterIdx = clusters.reduce((maxIdx, cluster, idx, arr) => cluster.length > arr[maxIdx].length ? idx : maxIdx, 0);
+      const largestCluster = clusters[largestClusterIdx];
+      const subVectors = largestCluster.map(idx => vectors[idx]);
+      const subClusters = kmeans(subVectors, 2);
+      if (subClusters.length === 2) {
+        const newCluster1 = subClusters[0].map(subIdx => largestCluster[subIdx]);
+        const newCluster2 = subClusters[1].map(subIdx => largestCluster[subIdx]);
+        clusters.splice(largestClusterIdx, 1, newCluster1, newCluster2);
+      } else {
+        break;
+      }
     }
 
-    // Passo 7: Mapear os índices de volta para as categorias e gerar nomes dos clusters
+    // Step 8: Use input scores to order categories
+    const categoryScores = inputScores;
+
+    // Step 9: Map indices back to categories and generate cluster names
     const result = {};
     clusters.forEach(cluster => {
       const clusterCategories = cluster.map(index => categoryKeys[index]);
-      // Ordenar as categorias pelo score para pegar as 3 mais famosas
-      const sortedCategories = clusterCategories.sort((a, b) => categoryScores[b] - categoryScores[a]);
-      // Selecionar até 3 categorias (ou menos, se o cluster tiver menos de 3)
+      // Order categories by input score
+      const sortedCategories = clusterCategories.sort((a, b) => (categoryScores[b] || 0) - (categoryScores[a] || 0));
+      // Select up to 3 categories (or less, if the cluster has less than 3)
       const topCategories = sortedCategories.slice(0, Math.min(3, sortedCategories.length));
-      // Criar o nome do cluster juntando as 3 categorias com vírgulas
+      // Create the cluster name by joining the 3 categories with commas
       const clusterName = topCategories.join(', ');
-      // Atribuir a lista de categorias ao cluster no objeto resultado
+      // Assign the list of categories to the cluster in the result object
       result[clusterName] = clusterCategories;
     });
     return result;
@@ -59846,7 +59904,7 @@ class Trias {
    */
   async purge() {
     const allowedOmens = Math.floor(this.maxModelSize / this.avgOmenSize);
-    if (this.omens.length <= allowedOmens) return;
+    if (!allowedOmens || allowedOmens <= 0 || isNaN(allowedOmens) || this.omens.length <= allowedOmens) return;
     this.isPurging = true;
     let err = null;
     try {
@@ -59942,12 +60000,14 @@ class Trias {
     }
     if (err) throw err;
   }
-  async save() {
+  async save(force) {
     this.isSaving = true;
     let err = null;
     try {
-      await this.initialized;
-      await this.trained;
+      if (force !== true) {
+        await this.initialized;
+        await this.trained;
+      }
       await this.purge();
       await saveModel(this.file, this.toJSON());
       const {
