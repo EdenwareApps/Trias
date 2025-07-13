@@ -5,11 +5,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import assert from 'assert';
 
-// Configuração do __dirname para módulos ES
+// __dirname configuration for ES modules
 const __dirname = path.dirname(import.meta.url.replace(new RegExp('^file:\/{2,3}'), ''));
 const modelFile = path.join(__dirname, 'model.trias');
 
-// Função para limpar o arquivo de modelo de teste
+// Function to clean up the test model file
 async function cleanup() {
   await fs.unlink(modelFile).catch(() => {});
 }
@@ -23,7 +23,9 @@ async function testTrainingAndPrediction() {
     language: 'en',
     capitalize: true,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracle.initialized;
 
@@ -32,10 +34,9 @@ async function testTrainingAndPrediction() {
     {input: 'Weather forecast with sunny skies', output: 'Weather'},
     {input: 'Stock market analysis with financial news', output: 'Finance'},
     {input: 'Culinary recipes and cooking tips', output: 'Cooking'},
-    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'},
-    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'},
-    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'},
-    {input: 'Weather forecast with sunny skies Stock market analysis with financial news Culinary recipes and cooking tips', output: 'Sparse'}
+    // If you want to test 'Sparse', use really generic examples:
+    {input: 'Random unrelated text', output: 'Sparse'},
+    {input: 'Miscellaneous information', output: 'Sparse'}
   ]);
 
   // Test predictions with similar texts
@@ -53,14 +54,17 @@ async function testTrainingAndPrediction() {
 
 async function testSaveAndLoad() {
   console.log("Executing: testSaveAndLoad");
-
+  await cleanup();
+  console.log('[testSaveAndLoad] Starting save/load test');
   // Create an instance and train
   const oracle = new Trias({
     file: modelFile,
     language: 'en',
     capitalize: true,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracle.initialized;
 
@@ -78,11 +82,13 @@ async function testSaveAndLoad() {
     language: 'en',
     capitalize: true,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracleReloaded.initialized;
 
-  // check if the model is loaded correctly, specially the properties that should be Maps or Sets, check if they are not empty
+  // check if the model is loaded correctly, especially the properties that should be Maps or Sets, check if they are not empty
   assert.ok(oracleReloaded.categoryStemToId.size > 0, "categoryStemToId should have at least one element");
   assert.ok(oracleReloaded.categoryVariations.size > 0, "categoryVariations should have at least one element");
   assert.ok(oracleReloaded.categoryRelations.size > 0, "categoryRelations should have at least one element");
@@ -103,7 +109,9 @@ async function testBestVariant() {
     language: 'en',
     capitalize: false,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracle.initialized;
 
@@ -123,7 +131,9 @@ async function testResetAndDestroy() {
     language: 'en',
     capitalize: true,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracle.initialized;
 
@@ -168,7 +178,9 @@ async function testWeightedPrediction() {
     language: 'en',
     capitalize: true,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracle.initialized;
 
@@ -203,7 +215,9 @@ async function testCategoryRelations() {
     language: 'en',
     capitalize: true,
     autoImport: false,
-    size: 512 * 1024
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
   });
   await oracle.initialized;
 
