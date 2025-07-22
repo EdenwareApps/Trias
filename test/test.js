@@ -234,6 +234,145 @@ async function testCategoryRelations() {
   console.log("testCategoryRelations passed.");
 }
 
+async function testReduceFunction() {
+  console.log("Executing: testReduceFunction");
+
+  await cleanup();
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
+  });
+  await oracle.initialized;
+
+  // Train with diverse categories
+  await oracle.train([
+    {input: 'Latest technology innovations', output: 'Technology'},
+    {input: 'Scientific discoveries and research', output: 'Science'},
+    {input: 'Health and medical advances', output: 'Health'},
+    {input: 'Business and financial news', output: 'Business'},
+    {input: 'Entertainment and media updates', output: 'Entertainment'},
+    {input: 'Sports and athletic achievements', output: 'Sports'}
+  ]);
+
+  // Test clustering with array input
+  const categories = ['Technology', 'Science', 'Health', 'Business', 'Entertainment', 'Sports'];
+  const clusters = await oracle.reduce(categories, { amount: 3 });
+  
+  assert.ok(typeof clusters === 'object', "Clusters should be an object");
+  assert.ok(Object.keys(clusters).length > 0, "Should have at least one cluster");
+  
+  // Verify all categories are included in clusters
+  const allClusteredCategories = Object.values(clusters).flat();
+  categories.forEach(category => {
+    assert.ok(allClusteredCategories.includes(category), `Category ${category} should be in clusters`);
+  });
+
+  // Test clustering with object input (weighted)
+  const weightedCategories = {
+    'Technology': 2,
+    'Science': 1.5,
+    'Health': 1,
+    'Business': 0.8,
+    'Entertainment': 0.5,
+    'Sports': 0.3
+  };
+  const weightedClusters = await oracle.reduce(weightedCategories, { amount: 2 });
+  
+  assert.ok(typeof weightedClusters === 'object', "Weighted clusters should be an object");
+  assert.ok(Object.keys(weightedClusters).length > 0, "Should have at least one weighted cluster");
+
+  console.log("testReduceFunction passed.");
+}
+
+async function testGravitationalGroups() {
+  console.log("Executing: testGravitationalGroups");
+
+  await cleanup();
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50,
+    weights: {
+      gravity: 0.5
+    }
+  });
+  await oracle.initialized;
+
+  // Train with some data
+  await oracle.train([
+    {input: 'Artificial intelligence and machine learning', output: 'Technology'},
+    {input: 'Medical treatments and healthcare', output: 'Health'},
+    {input: 'Software development and programming', output: 'Technology'}
+  ]);
+
+  // Add gravitational groups
+  oracle.addGravitationalGroups({
+    'tech': ['artificial intelligence', 'machine learning', 'software', 'programming'],
+    'health': ['medical', 'healthcare', 'treatment', 'therapy']
+  });
+
+  // Test prediction with gravitational influence
+  const prediction = await oracle.predict('AI and machine learning systems', { as: 'objects', amount: 3 });
+  
+  assert.ok(Array.isArray(prediction), "Prediction should be an array");
+  assert.ok(prediction.length > 0, "Should have at least one prediction");
+  
+  // Verify that Technology category is highly ranked due to gravitational groups
+  const techPrediction = prediction.find(p => p.category.toLowerCase() === 'technology');
+  assert.ok(techPrediction, "Technology should be in predictions due to gravitational groups");
+
+  console.log("testGravitationalGroups passed.");
+}
+
+async function testErrorHandling() {
+  console.log("Executing: testErrorHandling");
+
+  await cleanup();
+  const oracle = new Trias({
+    file: modelFile,
+    language: 'en',
+    capitalize: true,
+    autoImport: false,
+    size: 512 * 1024,
+    enableCaching: true,
+    batchSize: 50
+  });
+  await oracle.initialized;
+
+  // Test invalid input for reduce function
+  try {
+    await oracle.reduce(null, { amount: 3 });
+    assert.fail("Should throw error for null input");
+  } catch (err) {
+    // Check if error message contains the expected text
+    const hasValidError = err.message && (
+      err.message.includes('Invalid categories type') || 
+      err.message.includes('Invalid') ||
+      err.message.includes('null')
+    );
+    assert.ok(hasValidError, "Should throw appropriate error");
+  }
+
+  // Test invalid input for gravitational groups - should handle gracefully
+  try {
+    oracle.addGravitationalGroups(null);
+    // This should not throw
+  } catch (err) {
+    // If it throws, that's also acceptable as long as it doesn't crash
+  }
+
+  console.log("testErrorHandling passed.");
+}
+
 async function runAllTests() {
   try {
     await testTrainingAndPrediction();
@@ -242,6 +381,9 @@ async function runAllTests() {
     await testResetAndDestroy();
     await testWeightedPrediction();
     await testCategoryRelations();
+    await testReduceFunction();
+    await testGravitationalGroups();
+    await testErrorHandling();
     console.log("All tests passed successfully.");
   } catch (err) {
     console.error("Tests failed:", err);

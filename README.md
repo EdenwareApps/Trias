@@ -53,8 +53,12 @@ const trias = new Trias({
     create: true, // Initialize a new model if none exists
     n: 3, // Maximum n-gram length (1-3)
     language: 'en', // ISO 2-letter code for the language (e.g., 'en' for English)
+    weightExponent: 2, // Weight exponent for scoring
+    capitalize: false, // Capitalize category names in output
     excludes: ['separator', 'live', 'unknown'], // Terms to exclude
     size: 4096 * 1024, // Maximum model size in bytes
+    autoImport: false, // Auto-import pre-trained models
+    modelUrl: 'https://edenware.app/trias/trained/{language}.trias', // URL for pre-trained models
     
     // Performance options
     enableCaching: true, // Enable prediction caching
@@ -139,7 +143,7 @@ await trias.train([
 ]);
 
 // Find related categories
-const related = await trias.related('Sports', { amount: 3 });
+const related = await trias.related({ 'Sports': 1 }, { amount: 3 });
 console.log(related); // ['Soccer', 'Football']
 ```
 
@@ -194,6 +198,8 @@ trias.reset();
 3. **Use Streaming**: Enable `enableStreaming` for very large datasets
 4. **Monitor Memory**: Use `size` option to limit model size
 5. **Exclude Categories**: Use `excludes` to filter unwanted categories
+6. **Optimize Weights**: Adjust `weightExponent` for different scoring behaviors
+7. **Use Auto-Import**: Enable `autoImport` to use pre-trained models
 
 ## API Reference
 
@@ -205,9 +211,12 @@ trias.reset();
 | `create`        | `boolean` | `true`            | Automatically create a new model if the file is not found.     |
 | `n`             | `number`  | `3`               | Maximum n-gram length to generate (e.g., 1–3).                       |
 | `language`      | `string`  | `'en'`            | ISO 2-letter language code for stemming (e.g., `'en'` for English). |
+| `weightExponent`| `number`  | `2`               | Weight exponent for scoring calculations.                           |
 | `capitalize`    | `boolean` | `false`           | If true, capitalizes the category names in the prediction output.   |
 | `excludes`      | `array`   | `['separator', ...]` | List of tokens to exclude during processing.                      |
 | `size`          | `number`  | `4096 * 1024`      | Maximum model file size in bytes (approximately 4MB).             |
+| `autoImport`    | `boolean` | `false`           | Automatically import pre-trained models if available.              |
+| `modelUrl`      | `string`  | `'https://edenware.app/trias/trained/{language}.trias'` | URL template for pre-trained models. |
 | `enableCaching` | `boolean` | `true`            | Enable prediction caching.                                         |
 | `cacheSize`     | `number`  | `1000`            | Cache size limit.                                                  |
 | `batchSize`     | `number`  | `100`             | Training batch size.                                               |
@@ -247,6 +256,11 @@ Get related groups of categories based on the input category scores.
 
 **Returns:** Related groups of categories in the specified format.
 
+**Example:**
+```javascript
+const related = await trias.related({ 'Sports': 1, 'Technology': 0.5 }, { amount: 3 });
+```
+
 #### `reduce(categories, options)`
 
 Group categories into clusters based on learned relations.
@@ -280,4 +294,7 @@ Destroys the instance and rejects pending operations.
 ## Notes
 
 - `Trias` may remove infrequently used omens to maintain the model within the specified size limit.
+- All methods are asynchronous for better performance and non-blocking operation.
+- The module supports both ES modules and CommonJS for maximum compatibility.
+- Farsi stemming is currently disabled but the module handles it gracefully.
 - You can review some examples of `Trias` usage in the [test.js](https://github.com/EdenwareApps/Trias/blob/main/test/test.js) and [test-alt.js](https://github.com/EdenwareApps/Trias/blob/main/test/test-alt.js) files.

@@ -1,7 +1,7 @@
 {
   "name": "trias",
-  "version": "0.1.4",
-  "description": "",
+  "version": "0.1.5",
+  "description": "Advanced text classification and prediction module with multi-language support, clustering, and gravitational groups",
   "license": "ISC",
   "author": "",
   "type": "module",
@@ -14,7 +14,9 @@
   },
   "scripts": {
     "test": "node test/test.js",
-    "prepare": "npx rollup -c"
+    "test:all": "npm test && node test/test-reduce.js && node test/test-stemming.js && node test/test-alt.js && node test/test-lru-cache.js",
+    "prepare": "npx rollup -c",
+    "build": "npx rollup -c"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -27,5 +29,24 @@
     "@rollup/plugin-node-resolve": "^16.0.0",
     "rollup": "^4.34.8",
     "rollup-plugin-node-builtins": "^2.1.2"
-  }
+  },
+  "keywords": [
+    "text-classification",
+    "prediction",
+    "machine-learning",
+    "nlp",
+    "clustering",
+    "multi-language",
+    "stemming",
+    "tf-idf",
+    "natural-language-processing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EdenwareApps/Trias.git"
+  },
+  "bugs": {
+    "url": "https://github.com/EdenwareApps/Trias/issues"
+  },
+  "homepage": "https://github.com/EdenwareApps/Trias#readme"
 }

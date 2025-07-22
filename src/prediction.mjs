@@ -367,7 +367,6 @@ export function predictText(text, context) {
       gravitationalBoost.delete(groupName);
     }
   });
-  console.log({ topScore, gravitationalBoost });
 
   results.forEach(result => {
     const categoryStem = result.category;
@@ -463,4 +462,205 @@ export function predictWeightedText(inputObj, context) {
   });
 
   return results.map(r => ({ ...r, score: r.score / sumExp }));
+}
+
+/**
+ * Reduces a list of categories to a specified number of clusters,
+ * grouping them by themes based on learned co-occurrence relations.
+ * @param {string[]|Object} categories - List of categories or object with categories and scores.
+ * @param {Object} options - Options: { amount: desired number of clusters }.
+ * @param {Object} context - The model context.
+ * @returns {Object} - Object mapping cluster names to arrays of categories.
+ */
+export function reduce(categories, options = { amount: 3 }, context) {
+  const { amount } = options;
+
+  // Step 1: Convert input to an object with scores
+  let inputScores;
+  if (Array.isArray(categories)) {
+    inputScores = {};
+    for (const category of categories) {
+      inputScores[category] = 1;
+    }
+  } else if (typeof categories === 'object' && categories !== null) {
+    inputScores = categories;
+  } else {
+    throw new Error('Invalid categories type');
+  }
+  const candidates = {};
+
+  // Step 2: Normalize categories to their stems and collect all relevant omens
+  const stems = {};
+  const allCategories = Object.keys(inputScores);
+  for (const category of allCategories) {
+    stems[category] = context.stemmer.tokenizeAndStem(category).map(c => context.omenMapping.get(c));
+  }
+  const interests = new Set(Object.values(stems).flat().filter(n => n !== undefined));
+
+  // Step 3: Calculate scores for each category/oracleId, weighted by input scores
+  for (const [categoryStem, oracleId] of context.categoryStemToId.entries()) {
+    context.omenFrequencies[oracleId].forEach((freq, omenId) => {
+      if (interests.has(omenId)) {
+        for (const stemId of allCategories) {
+          if (!stems[stemId].includes(omenId)) continue;
+          if (!candidates[stemId]) candidates[stemId] = {};
+          if (typeof candidates[stemId][oracleId] === 'undefined') candidates[stemId][oracleId] = 0;
+          const categoryScore = inputScores[stemId] || 0;
+          candidates[stemId][oracleId] += categoryScore * (freq / context.omenDocFreq[omenId]) / context.divinerDocCount[oracleId];
+        }
+      }
+    });
+  }
+
+  // Step 4: Create feature vectors for all categories
+  const featureVectors = {};
+  const allOracleIds = new Set();
+  for (const stemId in candidates) {
+    for (const oracleId in candidates[stemId]) {
+      allOracleIds.add(oracleId);
+    }
+  }
+
+  // Initialize vectors for all categories, even those without candidates
+  for (const stemId of allCategories) {
+    featureVectors[stemId] = {};
+    const hasData = candidates[stemId] && Object.keys(candidates[stemId]).length > 0;
+    for (const oracleId of allOracleIds) {
+      if (hasData) {
+        featureVectors[stemId][oracleId] = candidates[stemId][oracleId] || 0;
+      } else {
+        // Assign a small random value to avoid identical vectors
+        featureVectors[stemId][oracleId] = Math.random() * 0.01;
+      }
+    }
+  }
+
+  // Step 5: Normalize vectors
+  for (const stemId in featureVectors) {
+    const vector = featureVectors[stemId];
+    const norm = Math.sqrt(Object.values(vector).reduce((sum, val) => sum + val * val, 0));
+    for (const oracleId in vector) {
+      vector[oracleId] = norm === 0 ? 0 : vector[oracleId] / norm;
+    }
+  }
+
+  // Step 6: Implement K-means for clustering with K-means++
+  function euclideanDistance(vec1, vec2) {
+    let sum = 0;
+    for (const key in vec1) {
+      const diff = vec1[key] - (vec2[key] || 0);
+      sum += diff * diff;
+    }
+    return Math.sqrt(sum);
+  }
+
+  function kmeansPlusPlusInit(vectors, k) {
+    const centroids = [];
+    const n = vectors.length;
+    const firstIdx = Math.floor(Math.random() * n);
+    centroids.push({ ...vectors[firstIdx] });
+    
+    for (let i = 1; i < k; i++) {
+      const distances = vectors.map(vec => {
+        const minDist = Math.min(...centroids.map(centroid => euclideanDistance(vec, centroid)));
+        return minDist ** 2;
+      });
+      const totalDist = distances.reduce((sum, d) => sum + d, 0);
+      const randVal = Math.random() * totalDist;
+      let cumulative = 0;
+      let nextIdx = 0;
+      for (let j = 0; j < n; j++) {
+        cumulative += distances[j];
+        if (cumulative >= randVal) {
+          nextIdx = j;
+          break;
+        }
+      }
+      centroids.push({ ...vectors[nextIdx] });
+    }
+    return centroids;
+  }
+
+  function kmeans(vectors, k, maxIter = 300) {
+    const n = vectors.length;
+    if (n < k) return Array.from({ length: n }, (_, i) => [i]);
+    
+    const centroids = kmeansPlusPlusInit(vectors, k);
+    let assignments = new Array(n).fill(0);
+    
+    for (let iter = 0; iter < maxIter; iter++) {
+      const newAssignments = vectors.map(vec => {
+        let minDist = Infinity;
+        let cluster = 0;
+        centroids.forEach((centroid, cIdx) => {
+          const dist = euclideanDistance(vec, centroid);
+          if (dist < minDist) {
+            minDist = dist;
+            cluster = cIdx;
+          }
+        });
+        return cluster;
+      });
+      
+      if (newAssignments.every((val, idx) => val === assignments[idx])) {
+        break;
+      }
+      assignments = newAssignments;
+      
+      centroids.forEach((centroid, cIdx) => {
+        const pointsInCluster = vectors.filter((_, idx) => assignments[idx] === cIdx);
+        if (pointsInCluster.length === 0) return;
+        for (const key in centroid) {
+          centroid[key] = pointsInCluster.reduce((sum, vec) => sum + (vec[key] || 0), 0) / pointsInCluster.length;
+        }
+      });
+    }
+    
+    const clusters = Array.from({ length: k }, () => []);
+    assignments.forEach((cluster, idx) => {
+      clusters[cluster].push(idx);
+    });
+    return clusters.filter(cluster => cluster.length > 0);
+  }
+
+  // Execute K-means
+  const vectors = Object.values(featureVectors);
+  const categoryKeys = Object.keys(featureVectors);
+  const numClusters = Math.min(amount || 3, categoryKeys.length);
+  let clusters = kmeans(vectors, numClusters);
+
+  // Step 7: Split large clusters if necessary
+  while (clusters.length < numClusters && clusters.some(cluster => cluster.length > 1)) {
+    const largestClusterIdx = clusters.reduce((maxIdx, cluster, idx, arr) => 
+      cluster.length > arr[maxIdx].length ? idx : maxIdx, 0);
+    const largestCluster = clusters[largestClusterIdx];
+    const subVectors = largestCluster.map(idx => vectors[idx]);
+    const subClusters = kmeans(subVectors, 2);
+    if (subClusters.length === 2) {
+      const newCluster1 = subClusters[0].map(subIdx => largestCluster[subIdx]);
+      const newCluster2 = subClusters[1].map(subIdx => largestCluster[subIdx]);
+      clusters.splice(largestClusterIdx, 1, newCluster1, newCluster2);
+    } else {
+      break;
+    }
+  }
+
+  // Step 8: Use input scores to order categories
+  const categoryScores = inputScores;
+
+  // Step 9: Map indices back to categories and generate cluster names
+  const result = {};
+  clusters.forEach(cluster => {
+    const clusterCategories = cluster.map(index => categoryKeys[index]);
+    // Order categories by input score
+    const sortedCategories = clusterCategories.sort((a, b) => (categoryScores[b] || 0) - (categoryScores[a] || 0));
+    // Select up to 3 categories (or less, if the cluster has less than 3)
+    const topCategories = sortedCategories.slice(0, Math.min(3, sortedCategories.length));
+    // Create the cluster name by joining the 3 categories with commas
+    const clusterName = topCategories.join(', ');
+    // Assign the list of categories to the cluster in the result object
+    result[clusterName] = clusterCategories;
+  });
+  
+  return result;
 }

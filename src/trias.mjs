@@ -499,7 +499,7 @@ export class Trias {
         }
 
         // Use optimized clustering
-        return await Prediction.reduce(categories, options, this);
+        return Prediction.reduce(categories, options, this);
     }
 
     // Optimized purge with streaming
