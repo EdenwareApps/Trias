@@ -90,22 +90,26 @@ function preprocess(context) {
     const omenFreq = context.omenFrequencies[oracleId];
     const totalOmens = context.omenCount[oracleId];
     const omenProbMap = new Map();
-    context.omens.forEach(omenId => {
+    // Iterate over omen indices, not omen strings
+    for (let i = 0; i < context.omens.length; i++) {
+      const omenId = i;
       const freq = omenFreq.get(omenId) || 0;
       const pOmen = (freq + 0.5) / (totalOmens + 0.5 * context.omens.length);
       omenProbMap.set(omenId, pOmen);
-    });
+    }
     pOmenCache.set(oracleId, omenProbMap);
   }
   context.preprocessed.pOmen = pOmenCache;
   
   // Pre-process IDF
   const idfCache = new Map();
-  context.omens.forEach(omenId => {
+  // Iterate over omen indices, not omen strings
+  for (let i = 0; i < context.omens.length; i++) {
+    const omenId = i;
     const df = context.omenDocFreq[omenId] || 0;
     const idf = Math.log((totalDocuments + 1) / (df + 1));
     idfCache.set(omenId, idf);
-  });
+  }
   context.preprocessed.idf = idfCache;
 
   // Pre-process: TF-IDF
@@ -114,11 +118,13 @@ function preprocess(context) {
     const omenFreq = context.omenFrequencies[oracleId];
     const totalOmens = context.omenCount[oracleId];
     const tfidfVector = new Map();
-    context.omens.forEach(omenId => {
+    // Iterate over omen indices, not omen strings
+    for (let i = 0; i < context.omens.length; i++) {
+      const omenId = i;
       const tf = (omenFreq.get(omenId) || 0) / totalOmens;
       const idf = idfCache.get(omenId);
       tfidfVector.set(omenId, tf * idf);
-    });
+    }
     categoryTFIDF.set(oracleId, tfidfVector);
   }
   context.preprocessed.categoryTFIDF = categoryTFIDF;

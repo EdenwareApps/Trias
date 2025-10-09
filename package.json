@@ -1,6 +1,6 @@
 {
   "name": "trias",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Advanced text classification and prediction module with multi-language support, clustering, and gravitational groups",
   "license": "ISC",
   "author": "",

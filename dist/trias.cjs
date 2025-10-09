@@ -58969,22 +58969,26 @@ function preprocess(context) {
     const omenFreq = context.omenFrequencies[oracleId];
     const totalOmens = context.omenCount[oracleId];
     const omenProbMap = new Map();
-    context.omens.forEach(omenId => {
+    // Iterate over omen indices, not omen strings
+    for (let i = 0; i < context.omens.length; i++) {
+      const omenId = i;
       const freq = omenFreq.get(omenId) || 0;
       const pOmen = (freq + 0.5) / (totalOmens + 0.5 * context.omens.length);
       omenProbMap.set(omenId, pOmen);
-    });
+    }
     pOmenCache.set(oracleId, omenProbMap);
   }
   context.preprocessed.pOmen = pOmenCache;
 
   // Pre-process IDF
   const idfCache = new Map();
-  context.omens.forEach(omenId => {
+  // Iterate over omen indices, not omen strings
+  for (let i = 0; i < context.omens.length; i++) {
+    const omenId = i;
     const df = context.omenDocFreq[omenId] || 0;
     const idf = Math.log((totalDocuments + 1) / (df + 1));
     idfCache.set(omenId, idf);
-  });
+  }
   context.preprocessed.idf = idfCache;
 
   // Pre-process: TF-IDF
@@ -58993,11 +58997,13 @@ function preprocess(context) {
     const omenFreq = context.omenFrequencies[oracleId];
     const totalOmens = context.omenCount[oracleId];
     const tfidfVector = new Map();
-    context.omens.forEach(omenId => {
+    // Iterate over omen indices, not omen strings
+    for (let i = 0; i < context.omens.length; i++) {
+      const omenId = i;
       const tf = (omenFreq.get(omenId) || 0) / totalOmens;
       const idf = idfCache.get(omenId);
       tfidfVector.set(omenId, tf * idf);
-    });
+    }
     categoryTFIDF.set(oracleId, tfidfVector);
   }
   context.preprocessed.categoryTFIDF = categoryTFIDF;
@@ -59634,25 +59640,76 @@ class Trias {
     if (typeof data === 'string') {
       data = JSON.parse(data);
     }
-    // Restore Maps and Sets
-    this.categoryStemToId = new Map(data.categoryStemToId || []);
-    this.categoryVariations = new Map(Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [stem, new Map(Object.entries(variations))]));
-    this.categoryRelations = new Map(Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [cat, new Map(Object.entries(relObj))]));
-    this.omenMapping = new Map(data.omenMapping || []);
-    this.excludes = new Set(data.excludes || []);
-    this.omenFrequencies = (data.omenFrequencies || []).map(item => new Map(Object.entries(item || {}).map(([k, v]) => [Number(k), v])));
-    this.gravitationalGroups = new Map(Object.entries(data.gravitationalGroups || {}).map(([key, group]) => [key, {
-      members: new Set(group.members),
-      strength: group.strength
-    }]));
-    // Copy primitive properties
-    this.divinerGroups = data.divinerGroups || [];
-    this.divinerDocCount = data.divinerDocCount || [];
-    this.omenCount = data.omenCount || [];
-    this.omens = data.omens || [];
-    this.omenDocFreq = data.omenDocFreq || [];
-    this.totalDocuments = Number(data.totalDocuments) || 0;
-    this.weightExponent = Number(data.weightExponent) || 2;
+
+    // Check if this is old format data (has idToCategory and idToWord)
+    const isOldFormat = data.idToCategory && data.idToWord && !data.omens;
+    if (isOldFormat) {
+      // Convert old format to new format
+      console.log("🔄 Converting old format data to new format...");
+
+      // Convert idToCategory to categoryStemToId
+      const categoryStemToId = new Map();
+      if (data.idToCategory) {
+        Object.entries(data.idToCategory).forEach(([id, category]) => {
+          const stem = this.stemmer.stem(category.toLowerCase());
+          categoryStemToId.set(stem, Number(id));
+        });
+      }
+
+      // Convert idToWord to omens and omenMapping
+      const omens = [];
+      const omenMapping = new Map();
+      if (data.idToWord) {
+        Object.entries(data.idToWord).forEach(([id, word]) => {
+          const numId = Number(id);
+          omens[numId] = word;
+          omenMapping.set(word, numId);
+        });
+      }
+
+      // Set converted data
+      this.categoryStemToId = categoryStemToId;
+      this.omens = omens;
+      this.omenMapping = omenMapping;
+
+      // Initialize other properties with defaults
+      this.categoryVariations = new Map();
+      this.categoryRelations = new Map();
+      this.excludes = new Set();
+      this.omenFrequencies = [];
+      this.gravitationalGroups = new Map();
+      this.divinerGroups = [];
+      this.divinerDocCount = [];
+      this.omenCount = [];
+      this.omenDocFreq = [];
+      this.totalDocuments = Number(data.totalDocuments) || 0;
+      this.weightExponent = Number(data.weightExponent) || 2;
+      console.log(`✅ Converted old format: ${this.omens.length} omens, ${this.categoryStemToId.size} categories`);
+    } else {
+      // New format - restore Maps and Sets
+      this.categoryStemToId = new Map(data.categoryStemToId || []);
+      this.categoryVariations = new Map(Object.entries(data.categoryVariations || {}).map(([stem, variations]) => [stem, new Map(Object.entries(variations))]));
+      this.categoryRelations = new Map(Object.entries(data.categoryRelations || {}).map(([cat, relObj]) => [cat, new Map(Object.entries(relObj))]));
+      this.omenMapping = new Map(data.omenMapping || []);
+      this.excludes = new Set(data.excludes || []);
+      this.omenFrequencies = (data.omenFrequencies || []).map(item => new Map(Object.entries(item || {}).map(([k, v]) => [Number(k), v])));
+      this.gravitationalGroups = new Map(Object.entries(data.gravitationalGroups || {}).map(([key, group]) => [key, {
+        members: new Set(group.members),
+        strength: group.strength
+      }]));
+      // Copy primitive properties
+      this.divinerGroups = data.divinerGroups || [];
+      this.divinerDocCount = data.divinerDocCount || [];
+      this.omenCount = data.omenCount || [];
+      this.omens = data.omens || [];
+      this.omenDocFreq = data.omenDocFreq || [];
+      this.totalDocuments = Number(data.totalDocuments) || 0;
+      this.weightExponent = Number(data.weightExponent) || 2;
+    }
+
+    // Mark as loaded when deserialized from JSON
+    this.isLoaded = true;
+
     // Return this for chaining
     return this;
   }
@@ -59719,7 +59776,9 @@ class Trias {
       if (this.create) {
         this.reset();
       } else {
-        throw new Error('Model file not found');
+        // Don't throw error if file doesn't exist and create is false
+        // This allows for manual initialization via fromJSON()
+        return;
       }
     } else {
       try {
@@ -59838,7 +59897,10 @@ class Trias {
     as: 'string',
     amount: 1
   }) {
-    await this.initialized;
+    // Only wait for initialization if not already loaded via JSON
+    if (this.initialized && !this.isLoaded) {
+      await this.initialized;
+    }
     await this.trained;
 
     // Check cache first
@@ -59920,10 +59982,22 @@ class Trias {
   }
 
   // Optimized related function
-  related(inputScores, options = {
+  async related(inputScores, options = {
     as: 'objects',
     amount: 5
   }) {
+    // Only wait for initialization if not already loaded via JSON
+    if (this.initialized && !this.isLoaded) {
+      await this.initialized;
+    }
+    await this.trained;
+
+    // Normalize options to ensure we have both amount and limit
+    const targetAmount = options.amount || options.limit || 5;
+    const normalizedOptions = {
+      ...options,
+      amount: targetAmount
+    };
     const relatedScores = new Map();
     let found = false;
     if (typeof inputScores === 'string') {
@@ -59953,12 +60027,12 @@ class Trias {
     }
 
     // Fallback with optimization
-    if (candidates.length < options.amount) {
+    if (candidates.length < targetAmount) {
       const fallbackResults = predictWeightedText(inputScores, this);
       const existingCategories = new Set(candidates.map(c => c.category));
       candidates = candidates.concat(fallbackResults.filter(candidate => !existingCategories.has(candidate.category)));
     }
-    return norm(candidates, options, this.bestVariant.bind(this), this.capitalize);
+    return norm(candidates, normalizedOptions, this.bestVariant.bind(this), this.capitalize);
   }
 
   // Optimized reduce with early termination
@@ -60007,7 +60081,8 @@ class Trias {
     // Calculate scores efficiently
     const scoredOmens = new Array(this.omens.length);
     const categoryStats = new Map();
-    for (const [categoryId, count] of this.divinerDocCount.entries()) {
+    for (let categoryId = 0; categoryId < this.divinerDocCount.length; categoryId++) {
+      const count = this.divinerDocCount[categoryId];
       categoryStats.set(categoryId, {
         currentCount: count,
         targetCount: Math.floor(allowedOmens / this.divinerGroups.length)
